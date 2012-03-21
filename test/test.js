@@ -7,6 +7,15 @@
         return thing.lock && thing.locked && thing.fire && thing.fireWith;
     }
 
+    function shouldTrow(data, exceptionName) {
+        try {
+            $.intercal(data);
+            fail("should raise exception: " + exceptionName);
+        } catch (error) {
+            equal(error.name, exceptionName);
+        }
+    }
+
     test("empty constructor", function () {
         ok($.intercal());
         deepEqual($.intercal().once, {});
@@ -49,6 +58,20 @@
         ok(looksLikeDeferred(ic.once.page.ready.fail.withStyle));
     });
 
+    test("fail if toplevel deferred is a reserved word", function () {
+        shouldTrow({"once": {"reset": ""}}, "intercal.Error");
+        shouldTrow({"once": {"reset": "foo bar"}}, "intercal.Error");
+        // this shouldnt throw
+        var ic = $.intercal({"once": {"simple": "reset"}});
+        ok(looksLikeDeferred(ic.once.simple.reset));
+
+        ic = $.intercal({"once": {"nested": {"reset": ""}}});
+        ok(looksLikeDeferred(ic.once.nested.reset));
+        ic = $.intercal({"once": {"nested": {"reset": "foo"}}});
+        ok(looksLikeDeferred(ic.once.nested.reset.foo));
+    });
+
+
     test("create simple callback", function () {
         var ic = $.intercal({"on": {"simple": ""}});
         ok(looksLikeCallback(ic.on.simple));
@@ -77,15 +100,6 @@
         ok(looksLikeCallback(ic.on.page.ready.fail.horribly));
         ok(looksLikeCallback(ic.on.page.ready.fail.withStyle));
     });
-
-    function shouldTrow(data, exceptionName) {
-        try {
-            $.intercal(data);
-            fail("should raise exception: " + exceptionName);
-        } catch (error) {
-            equal(error.name, exceptionName);
-        }
-    }
 
     test("fail with reserved callback name in simple callback", function () {
         shouldTrow({"on": {"any": ""}}, "intercal.Error");

@@ -1,10 +1,14 @@
 (function ($) {
 
-    function buildDeferreds(onces, obj) {
+    function buildDeferreds(onces, obj, isTopLevel) {
         var key, value, names, i, name;
 
         for (key in onces) {
             value = onces[key];
+
+            if (isTopLevel && key === "reset") {
+                throw new intercal.Error("using reserved name for toplevel deferred: " + key);
+            }
 
             if ($.isPlainObject(value)) {
                 // if the value is an object create the nested deferreds
@@ -84,7 +88,7 @@
                 "on": {}
             };
 
-            buildDeferreds(onces, obj.once);
+            buildDeferreds(onces, obj.once, true);
             buildCallbacks(events, obj.on);
 
             return obj;
