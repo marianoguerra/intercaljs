@@ -25,11 +25,24 @@
 
     function shouldTrow(data, exceptionName) {
         try {
-            $.intercal(data);
+            if ($.isFunction(data)) {
+                data();
+            } else {
+                $.intercal(data);
+            }
+
             fail("should raise exception: " + exceptionName);
         } catch (error) {
             equal(error.name, exceptionName);
         }
+    }
+
+    function cbs() {
+        return $.Callbacks();
+    }
+
+    function dfd() {
+        return $.Deferred();
     }
 
     module("intercal");
@@ -150,12 +163,12 @@
         var barrier = $.intercal.barrier(1);
 
         ok(!barrier.locked());
-        barrier.add($.Callbacks());
+        barrier.add(cbs());
         ok(barrier.locked());
     });
 
     test("locks automatically with items in construction", function () {
-        var barrier = $.intercal.barrier([$.Callbacks()]);
+        var barrier = $.intercal.barrier([cbs()]);
         ok(barrier.locked());
     });
 
@@ -163,7 +176,7 @@
         var barrier = $.intercal.barrier();
 
         ok(!barrier.locked());
-        barrier.add($.Callbacks());
+        barrier.add(cbs());
         barrier.lock();
         ok(barrier.locked());
     });
@@ -180,7 +193,7 @@
             failCalled = true;
         });
 
-        barrier.add($.Callbacks());
+        barrier.add(cbs());
 
         setTimeout(function () {
             equal(timedout, true, "timedout should be updated by timeout callback");
@@ -221,20 +234,47 @@
         ok(resolved);
     }
 
+    function testAny(things, count) {
+        count = count || 1;
+        var barrier = $.intercal.any(things, count),
+            resolved = false, i;
+
+        barrier.done(function () {
+            resolved = true;
+        });
+
+        for (i = 0; i < things.length; i += 1) {
+
+            if (i >= count) {
+                equal(resolved, true, "resolved should be true, count " + count + " i " + i);
+            } else {
+                equal(resolved, false, "resolved shouldn't be true, count " + count + " i " + i);
+            }
+
+            if (things[i].fire) {
+                things[i].fire();
+            } else {
+                things[i].resolve();
+            }
+        }
+
+        equal(resolved, true, "should be resolved at the end");
+    }
+
     test("resolves for single callback", function () {
-        testResolve([$.Callbacks()]);
+        testResolve([cbs()]);
     });
 
     test("resolves for single deferred", function () {
-        testResolve([$.Deferred()]);
+        testResolve([dfd()]);
     });
 
     test("resolves mixed", function () {
-        testResolve([$.Deferred(), $.Callbacks()]);
+        testResolve([dfd(), cbs()]);
     });
 
     test("firing the same callback twice doesn't resolve if another is waiting", function () {
-        var cb1 = $.Callbacks(), cb2 = $.Callbacks(),
+        var cb1 = cbs(), cb2 = cbs(),
             barrier = $.intercal.barrier([cb1, cb2]),
             resolved = false;
 
@@ -250,7 +290,7 @@
     });
 
     test("returns status", function () {
-        var cb1 = $.Callbacks(), cb2 = $.Callbacks(),
+        var cb1 = cbs(), cb2 = cbs(),
             barrier = $.intercal.barrier([cb1, cb2]),
             statsBefore, statsBetween, statsAfter;
 
@@ -306,7 +346,7 @@
     });
 
     test("returns status for timedout barrier", function () {
-        var cb1 = $.Callbacks(), cb2 = $.Callbacks(),
+        var cb1 = cbs(), cb2 = cbs(),
             barrier = $.intercal.barrier([cb1, cb2], 1),
             stats;
 
@@ -319,6 +359,24 @@
             equal(stats.timedOut, true);
             equal(stats.finished, false);
         }, 100);
+    });
+
+    test("any", function () {
+        testAny([cbs()]);
+        testAny([cbs(), cbs(), cbs()]);
+        testAny([cbs(), cbs(), cbs()], 2);
+        testAny([cbs(), cbs(), cbs()], 3);
+    });
+
+    test("waiting for more than itemCount should raise an exception", function () {
+        function createBarrier(items, count) {
+            return function () {
+                $.intercal.barrier(items, 0, count);
+            };
+        }
+
+        shouldTrow(createBarrier(1, 2), "intercal.Error");
+        shouldTrow(createBarrier([cbs()], 2), "intercal.Error");
     });
 
 }());

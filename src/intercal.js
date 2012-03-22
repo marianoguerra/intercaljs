@@ -100,7 +100,7 @@
         return obj;
     };
 
-    intercal.barrier = function (itemCount, timeout) {
+    intercal.barrier = function (itemCount, timeout, waitCompletedCount) {
         var
             // if it doesn't accept more additions
             locked = false,
@@ -171,7 +171,8 @@
                 return;
             }
 
-            if (items.length === 0) {
+            // if all completed
+            if (waitCompletedCount === (total - items.length)) {
                 if (timeoutId !== null) {
                     clearTimeout(timeoutId);
                 }
@@ -243,6 +244,14 @@
             add(tmpItems);
         }
 
+        // number of items to wait for completion, by default wait until all
+        // are completed
+        waitCompletedCount = waitCompletedCount || itemCount;
+
+        if (waitCompletedCount > itemCount) {
+            throw new intercal.Error("waitCompletedCount can't be bigger than itemCount, will wait forever: " + waitCompletedCount + " > " + itemCount);
+        }
+
         promise = barrier.promise({timeout: timeoutList.add});
 
 
@@ -298,6 +307,11 @@
         };
 
         return obj;
+    };
+
+    intercal.all = intercal.barrier;
+    intercal.any = function (items, count, timeout) {
+        return intercal.barrier(items, timeout || 0, count || 1);
     };
 
     intercal.Error = function (message) {
