@@ -248,4 +248,77 @@
         cb2.fire();
         ok(resolved);
     });
+
+    test("returns status", function () {
+        var cb1 = $.Callbacks(), cb2 = $.Callbacks(),
+            barrier = $.intercal.barrier([cb1, cb2]),
+            statsBefore, statsBetween, statsAfter;
+
+        stop();
+
+        setTimeout(function () {
+            start();
+
+            statsBefore = barrier.status();
+            cb1.fire();
+            statsBetween = barrier.status();
+            cb2.fire();
+            statsAfter = barrier.status();
+
+            console.log(statsBefore, statsBetween, statsAfter);
+
+            equal(statsBefore.total, 2);
+            equal(statsBetween.total, 2);
+            equal(statsAfter.total, 2);
+
+            equal(statsBefore.remaining, 2);
+            equal(statsBetween.remaining, 1);
+            equal(statsAfter.remaining, 0);
+
+            equal(statsBefore.completed, 0);
+            equal(statsBetween.completed, 1);
+            equal(statsAfter.completed, 2);
+
+            equal(statsBefore.remainingTime, -1);
+            equal(statsBetween.remainingTime, -1);
+            equal(statsAfter.remainingTime, -1);
+
+            equal(statsBefore.endTime, -1);
+            equal(statsBetween.endTime, -1);
+            ok(statsAfter.endTime > 0);
+
+            equal(statsBefore.totalTime, -1);
+            equal(statsBetween.totalTime, -1);
+            ok(statsAfter.totalTime > 0);
+
+            ok(statsBefore.ellapsedTime > 0);
+            ok(statsBetween.ellapsedTime > 0);
+            ok(statsAfter.ellapsedTime > 0);
+
+            equal(statsBefore.timedOut, false);
+            equal(statsBetween.timedOut, false);
+            equal(statsAfter.timedOut, false);
+
+            equal(statsBefore.finished, false);
+            equal(statsBetween.finished, false);
+            equal(statsAfter.finished, true);
+        }, 100);
+    });
+
+    test("returns status for timedout barrier", function () {
+        var cb1 = $.Callbacks(), cb2 = $.Callbacks(),
+            barrier = $.intercal.barrier([cb1, cb2], 1),
+            stats;
+
+        stop();
+
+        setTimeout(function () {
+            start();
+            stats = barrier.status();
+
+            equal(stats.timedOut, true);
+            equal(stats.finished, false);
+        }, 100);
+    });
+
 }());

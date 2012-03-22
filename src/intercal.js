@@ -113,7 +113,7 @@
             // time it was locked
             startTime = 0,
             // time all items were completed
-            endTime = 0,
+            endTime = -1,
             // the deferred to use
             barrier = $.Deferred(),
             // callback list for timeout
@@ -175,6 +175,8 @@
                 if (timeoutId !== null) {
                     clearTimeout(timeoutId);
                 }
+
+                endTime = now();
 
                 if (failedArgs.length === 0) {
                     barrier.resolve();
@@ -257,7 +259,7 @@
 
             status: function () {
                 var completed = total - items.length,
-                    totalTime = 0,
+                    totalTime = -1,
                     remainingTime = -1;
 
                 if (endTime > 0) {
