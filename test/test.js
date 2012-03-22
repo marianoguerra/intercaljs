@@ -1,4 +1,7 @@
+/*global ok equal deepEqual fail test module start stop*/
 (function () {
+    "use strict";
+
     function looksLikeDeferred(thing) {
         return thing.pipe && thing.progress && thing.promise && thing.then;
     }
@@ -15,6 +18,8 @@
             equal(error.name, exceptionName);
         }
     }
+
+    module("intercal");
 
     test("empty constructor", function () {
         ok($.intercal());

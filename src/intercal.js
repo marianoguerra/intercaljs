@@ -1,4 +1,6 @@
 (function ($) {
+    "use strict";
+    var intercal;
 
     function buildDeferreds(onces, obj, isTopLevel) {
         var key, value, names, i, name;
@@ -42,7 +44,7 @@
         for (key in events) {
             value = events[key];
 
-            if (key === "any"){
+            if (key === "any") {
                 throw new intercal.Error("using reserved name for callback: " + key);
             }
 
@@ -62,7 +64,7 @@
                 for (i = 0; i < names.length; i += 1) {
                     name = names[i];
 
-                    if (name === "any"){
+                    if (name === "any") {
                         throw new intercal.Error("using reserved name for callback: " + name);
                     } else if (name !== "") {
                         obj[key][name] = $.Callbacks();
