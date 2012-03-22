@@ -188,6 +188,11 @@
 
             function actionFired() {
                 arrayRemove(items, action);
+                // unsubscribe if it's a callback
+                if (action.add && action.has) {
+                    action.remove(actionFired);
+                }
+
                 checkCompletion();
             }
 
