@@ -154,6 +154,11 @@
         ok(barrier.locked());
     });
 
+    test("locks automatically with items in construction", function () {
+        var barrier = $.intercal.barrier([$.Callbacks()]);
+        ok(barrier.locked());
+    });
+
     test("locks manually", function () {
         var barrier = $.intercal.barrier();
 
@@ -196,18 +201,51 @@
         testTimeout(barrier, barrier);
     });
 
-    test("resolves for single callback", function () {
-        var barrier = $.intercal.barrier(1),
-            resolved = false,
-            callback = $.Callbacks();
-
-        barrier.add(callback);
+    function testResolve(things) {
+        var barrier = $.intercal.barrier(things),
+            resolved = false, i;
 
         barrier.done(function () {
             resolved = true;
         });
 
-        callback.fire();
+        for (i = 0; i < things.length; i += 1) {
+            ok(!resolved);
+            if (things[i].fire) {
+                things[i].fire();
+            } else {
+                things[i].resolve();
+            }
+        }
+
+        ok(resolved);
+    }
+
+    test("resolves for single callback", function () {
+        testResolve([$.Callbacks()]);
+    });
+
+    test("resolves for single deferred", function () {
+        testResolve([$.Deferred()]);
+    });
+
+    test("resolves mixed", function () {
+        testResolve([$.Deferred(), $.Callbacks()]);
+    });
+
+    test("firing the same callback twice doesn't resolve if another is waiting", function () {
+        var cb1 = $.Callbacks(), cb2 = $.Callbacks(),
+            barrier = $.intercal.barrier([cb1, cb2]),
+            resolved = false;
+
+        barrier.done(function () {
+            resolved = true;
+        });
+
+        cb1.fire();
+        cb1.fire();
+        ok(!resolved);
+        cb2.fire();
         ok(resolved);
     });
 }());

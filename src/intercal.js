@@ -127,12 +127,11 @@
             // the promise for the barrier
             promise,
             // object to return from this function
-            obj;
+            obj,
+            tmpItems;
 
         itemCount = itemCount || 0;
         timeout = timeout || 0;
-
-        promise = barrier.promise({timeout: timeoutList.add});
 
         function fireTimeout() {
             timedOut = true;
@@ -206,6 +205,40 @@
             }
         }
 
+        function add(item) {
+            var i, action;
+
+            if (!$.isArray(item)) {
+                item = [item];
+            }
+
+            if (!locked) {
+                for (i = 0; i < item.length; i += 1) {
+                    action = item[i];
+                    items.push(action);
+
+                    listenForCompletion(action);
+
+                    if (items.length === itemCount) {
+                        lock();
+                        break;
+                    }
+                }
+
+            }
+        }
+
+        // if the first parameter is an array, add the items and lock
+        // set the length of the array to itemCount
+        if ($.isArray(itemCount)) {
+            tmpItems = itemCount;
+            itemCount = tmpItems.length;
+            add(tmpItems);
+        }
+
+        promise = barrier.promise({timeout: timeoutList.add});
+
+
         obj = barrier.promise({
             lock: lock,
 
@@ -213,28 +246,7 @@
                 return locked;
             },
 
-            add: function (item) {
-                var i, action;
-
-                if (!$.isArray(item)) {
-                    item = [item];
-                }
-
-                if (!locked) {
-                    for (i = 0; i < item.length; i += 1) {
-                        action = item[i];
-                        items.push(action);
-
-                        listenForCompletion(action);
-
-                        if (items.length === itemCount) {
-                            lock();
-                            break;
-                        }
-                    }
-
-                }
-            },
+            add: add,
 
             timeout: timeoutList.add,
 
