@@ -33,7 +33,7 @@
 
             fail("should raise exception: " + exceptionName);
         } catch (error) {
-            equal(error.name, exceptionName);
+            equal(error.name, exceptionName, "error name should be " + exceptionName);
         }
     }
 
@@ -305,8 +305,6 @@
             cb2.fire();
             statsAfter = barrier.status();
 
-            console.log(statsBefore, statsBetween, statsAfter);
-
             equal(statsBefore.total, 2);
             equal(statsBetween.total, 2);
             equal(statsAfter.total, 2);
@@ -377,6 +375,12 @@
 
         shouldTrow(createBarrier(1, 2), "intercal.Error");
         shouldTrow(createBarrier([cbs()], 2), "intercal.Error");
+    });
+
+    test("locking before reaching itemCount should fail", function () {
+        shouldTrow(function () {
+            $.intercal.barrier(2).lock();
+        }, "intercal.Error");
     });
 
 }());

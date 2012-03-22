@@ -143,6 +143,8 @@
 
             if (items.length === 0) {
                 throw new intercal.Error("trying to lock a barrier with no actions");
+            } else if (itemCount > 0 && items.length !== itemCount) {
+                throw new intercal.Error("trying to lock a barrier before reaching itemCount");
             }
 
             locked = true;
