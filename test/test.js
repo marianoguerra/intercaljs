@@ -10,6 +10,19 @@
         return thing.lock && thing.locked && thing.fire && thing.fireWith;
     }
 
+    function looksLikeBarrier(thing) {
+        return thing.add && thing.lock && thing.locked && thing.status && thing.promise;
+    }
+
+    function looksLikePromise(thing) {
+        return thing.then && thing.fail && thing.pipe && thing.progress &&
+                thing.done;
+    }
+
+    function looksLikeBarrierPromise(thing) {
+        return looksLikePromise(thing) && thing.timeout;
+    }
+
     function shouldTrow(data, exceptionName) {
         try {
             $.intercal(data);
@@ -119,5 +132,82 @@
         shouldTrow({"on": {"nested": {"any": ""}}}, "intercal.Error");
         shouldTrow({"on": {"nested": {"foo": "any"}}}, "intercal.Error");
         shouldTrow({"on": {"nested": {"foo": "bar any"}}}, "intercal.Error");
+    });
+
+    module("barrier");
+
+    test("construct", function () {
+        var barrier = $.intercal.barrier(3);
+        ok(looksLikeBarrier(barrier));
+    });
+
+    test("construct promise", function () {
+        var barrier = $.intercal.barrier(3);
+        ok(looksLikeBarrierPromise(barrier.promise()));
+    });
+
+    test("locks automatically after itemCount additions", function () {
+        var barrier = $.intercal.barrier(1);
+
+        ok(!barrier.locked());
+        barrier.add($.Callbacks());
+        ok(barrier.locked());
+    });
+
+    test("locks manually", function () {
+        var barrier = $.intercal.barrier();
+
+        ok(!barrier.locked());
+        barrier.add($.Callbacks());
+        barrier.lock();
+        ok(barrier.locked());
+    });
+
+    function testTimeout(barrier, connector) {
+        var timedout = false, failCalled = false;
+
+        connector.timeout(function () {
+            timedout = true;
+        });
+
+        connector.fail(function (cause) {
+            equal(cause, 'timeout');
+            failCalled = true;
+        });
+
+        barrier.add($.Callbacks());
+
+        setTimeout(function () {
+            equal(timedout, true, "timedout should be updated by timeout callback");
+            equal(failCalled, true, "fail should be called");
+            start();
+        }, 200);
+
+        stop();
+    }
+
+    test("timeouts (with promise)", function () {
+        var barrier = $.intercal.barrier(1, 1);
+        testTimeout(barrier, barrier.promise());
+    });
+
+    test("timeouts", function () {
+        var barrier = $.intercal.barrier(1, 1);
+        testTimeout(barrier, barrier);
+    });
+
+    test("resolves for single callback", function () {
+        var barrier = $.intercal.barrier(1),
+            resolved = false,
+            callback = $.Callbacks();
+
+        barrier.add(callback);
+
+        barrier.done(function () {
+            resolved = true;
+        });
+
+        callback.fire();
+        ok(resolved);
     });
 }());

@@ -76,7 +76,11 @@
         return obj;
     }
 
-    var intercal = function (data) {
+    function now() {
+        return (new Date()).getTime();
+    }
+
+    intercal = function (data) {
         data = data || {};
 
         var
@@ -90,15 +94,191 @@
                 "on": {}
             };
 
-            buildDeferreds(onces, obj.once, true);
-            buildCallbacks(events, obj.on);
+        buildDeferreds(onces, obj.once, true);
+        buildCallbacks(events, obj.on);
 
-            return obj;
+        return obj;
     };
 
-    intercal.barrier = function () {
-        return {
+    intercal.barrier = function (itemCount, timeout) {
+        var
+            // if it doesn't accept more additions
+            locked = false,
+            // items to wait for
+            items = [],
+            // total number of items after it's locked
+            total = 0,
+            // number of completed items
+            completed = 0,
+            // time it was locked
+            startTime = 0,
+            // time all items were completed
+            endTime = 0,
+            // the deferred to use
+            barrier = $.Deferred(),
+            // callback list for timeout
+            timeoutList = $.Callbacks("once memory"),
+            // the id from the timeout to cancel it later
+            timeoutId = null,
+            // flag to know if it already timed out
+            timedOut = false,
+            // list of list of arguments from failed deferreds
+            failedArgs = [],
+            // the promise for the barrier
+            promise,
+            // object to return from this function
+            obj;
+
+        itemCount = itemCount || 0;
+        timeout = timeout || 0;
+
+        promise = barrier.promise({timeout: timeoutList.add});
+
+        function fireTimeout() {
+            timedOut = true;
+            timeoutList.fire();
+            barrier.reject('timeout');
+        }
+
+        function lock() {
+
+            if (items.length === 0) {
+                throw new intercal.Error("trying to lock a barrier with no actions");
+            }
+
+            locked = true;
+            total = items.length;
+            startTime = now();
+
+            if (timeout > 0) {
+                timeoutId = setTimeout(fireTimeout, timeout);
+            }
+        }
+
+        function arrayRemove(arr, element) {
+            var i;
+
+            for (i = 0; i < arr.length; i += 1) {
+                if (element === arr[i]) {
+                    arr.splice(i, 1);
+                }
+            }
+
+            return arr;
+        }
+
+        function checkCompletion() {
+            if (timedOut) {
+                return;
+            }
+
+            if (items.length === 0) {
+                if (timeoutId !== null) {
+                    clearTimeout(timeoutId);
+                }
+
+                if (failedArgs.length === 0) {
+                    barrier.resolve();
+                } else {
+                    barrier.reject(failedArgs);
+                }
+            }
+        }
+
+        function listenForCompletion(action) {
+
+            function actionFired() {
+                arrayRemove(items, action);
+                checkCompletion();
+            }
+
+            if (action.add && action.has) {
+                // if is a callbacks object
+
+                action.add(actionFired);
+            } else {
+                // it must be a deferred/promise
+                action.done(actionFired);
+                action.fail(function () {
+                    failedArgs.push($.makeArray(arguments));
+                    actionFired();
+                });
+            }
+        }
+
+        obj = barrier.promise({
+            lock: lock,
+
+            locked: function () {
+                return locked;
+            },
+
+            add: function (item) {
+                var i, action;
+
+                if (!$.isArray(item)) {
+                    item = [item];
+                }
+
+                if (!locked) {
+                    for (i = 0; i < item.length; i += 1) {
+                        action = item[i];
+                        items.push(action);
+
+                        listenForCompletion(action);
+
+                        if (items.length === itemCount) {
+                            lock();
+                            break;
+                        }
+                    }
+
+                }
+            },
+
+            timeout: timeoutList.add,
+
+            status: function () {
+                var completed = total - items.length,
+                    totalTime = 0,
+                    remainingTime = -1;
+
+                if (endTime > 0) {
+                    totalTime = endTime - startTime;
+                }
+
+                return {
+                    // total number of items waiting for
+                    total: total,
+                    // number of items that already completed
+                    completed: completed,
+                    // number of items still waiting for
+                    remaining: total - completed,
+                    // time the barrier was locked
+                    startTime: startTime,
+                    // time running since the barrier was locked
+                    ellapsedTime: (endTime > 0) ? totalTime : now() - startTime,
+                    // time when the barrier finished
+                    endTime: endTime,
+                    // total time between start and end
+                    totalTime: totalTime,
+                    // time remaining before timeout or -1 if already finished or timed out
+                    remainingTime: (endTime < 1 && timeout > 0) ? now() - (startTime + timeout) : -1,
+                    // true if the barrier finished in some way
+                    finished: locked && itemCount > 0 && items.length === 0,
+                    // true if the barrier timedOut
+                    timedOut: timedOut
+                };
+            }
+        });
+
+        // override the promise function from obj (added by barrier.promise)
+        // since we want the timeout function in the promise too
+        obj.promise =  function () {
+            return promise;
         };
+
+        return obj;
     };
 
     intercal.Error = function (message) {
