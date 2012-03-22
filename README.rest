@@ -51,8 +51,8 @@ build it
     cd intercaljs
     ./build.sh
     
-lear more
----------
+learn more
+----------
 
 http://marianoguerra.github.com/intercaljs/
 
