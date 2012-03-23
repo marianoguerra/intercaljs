@@ -2,7 +2,7 @@
     "use strict";
     var intercal;
 
-    function buildDeferreds(onces, obj, isTopLevel) {
+    function buildDeferreds(onces, obj, external, isTopLevel) {
         var key, value, names, i, name;
 
         for (key in onces) {
@@ -14,22 +14,26 @@
 
             if ($.isPlainObject(value)) {
                 // if the value is an object create the nested deferreds
-                obj[key] = buildDeferreds(value, {});
+                external[key] = {};
+                obj[key] = buildDeferreds(value, {}, external[key]);
 
             } else if (value === "") {
                 // if the value is an empty string construct the deferred here
                 obj[key] = $.Deferred();
+                external[key] = obj[key].promise();
             } else {
                 // if the value is a space separated string construct
                 // the child deferreds
                 names = onces[key].split(/\s+/);
                 obj[key] = {};
+                external[key] = {};
 
                 for (i = 0; i < names.length; i += 1) {
                     name = names[i];
 
                     if (name !== "") {
                         obj[key][name] = $.Deferred();
+                        external[key][name] = obj[key][name].promise();
                     }
                 }
             }
@@ -38,7 +42,18 @@
         return obj;
     }
 
-    function buildCallbacks(events, obj) {
+    function makePublicCallbackAPI(callback) {
+        return {
+            // NOTE: you can reach the original callback with the this parameter
+            // on your callback, not sure if it's worth preventing
+            "add": callback.add,
+            "has": callback.has,
+            "remove": callback.remove,
+            "locked": callback.locked
+        };
+    }
+
+    function buildCallbacks(events, obj, external) {
         var key, value, names, i, name, callback, listener,
             globalListener = $.Callbacks();
 
@@ -60,18 +75,21 @@
 
             if ($.isPlainObject(value)) {
                 // if the value is an object create the nested callbacks
-                obj[key] = buildCallbacks(value, {});
+                external[key] = {};
+                obj[key] = buildCallbacks(value, {}, external[key]);
                 obj[key].then(listener.fire);
 
             } else if (value === "") {
                 // if the value is an empty string construct the callback here
                 obj[key] = $.Callbacks();
+                external[key] = makePublicCallbackAPI(obj[key]);
                 listenCallback(obj[key], listener);
             } else {
                 // if the value is a space separated string construct
                 // the child callbacks
                 names = events[key].split(/\s+/);
                 obj[key] = {"then": listener.add};
+                external[key] = {"then": listener.add};
 
                 for (i = 0; i < names.length; i += 1) {
                     name = names[i];
@@ -80,16 +98,19 @@
                         throw new intercal.Error("using reserved name for callback: " + name);
                     } else if (name !== "") {
                         obj[key][name] = $.Callbacks();
+                        external[key][name] = makePublicCallbackAPI(obj[key][name]);
                         listenCallback(obj[key][name], listener);
                     }
                 }
             }
 
             obj[key].then = listener.add;
+            external[key].then = listener.add;
             listener.add(globalListener.fire);
         }
 
         obj.then = globalListener.add;
+        external.then = globalListener.add;
 
         return obj;
     }
@@ -111,21 +132,42 @@
                 "once": {},
                 "on": {}
             },
-            resetCallback;
+            resetCallback,
+            // external deferred API
+            onceAPI = {},
+            // external callback API
+            eventAPI = {},
+            // flag that should update onceAPI
+            shouldUpdateOnceAPI = false;
 
-        buildCallbacks(events, obj.on);
+        buildCallbacks(events, obj.on, eventAPI);
 
         resetCallback = $.Callbacks();
 
         function reset() {
-            obj.once = buildDeferreds(onces, {"reset": obj.once.reset || reset}, true);
+            onceAPI = {};
+            obj.once = buildDeferreds(onces, {"reset": obj.once.reset || reset}, onceAPI, true);
+            shouldUpdateOnceAPI = true;
             resetCallback.fire();
+        }
+
+        function buildOnceAPI() {
+            return onceAPI;
+        }
+
+        function buildOnAPI(events) {
+            return eventAPI;
         }
 
         reset.done = resetCallback.add;
 
         // build deferreds for the first time
         reset();
+
+        obj.api = {
+            once: buildOnceAPI,
+            on: buildOnAPI
+        };
 
         return obj;
     };

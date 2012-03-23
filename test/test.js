@@ -10,6 +10,10 @@
         return thing.lock && thing.locked && thing.fire && thing.fireWith;
     }
 
+    function looksLikePublicCallback(thing) {
+        return thing.has && thing.add && thing.remove && thing.locked;
+    }
+
     function looksLikeBarrier(thing) {
         return thing.add && thing.lock && thing.locked && thing.status && thing.promise;
     }
@@ -68,6 +72,7 @@
         var ic = $.intercal({"once": {"simple": ""}});
 
         ok(looksLikeDeferred(ic.once.simple));
+        ok(looksLikePromise(ic.api.once().simple));
     });
 
     test("create simple childs deferred", function () {
@@ -116,7 +121,9 @@
         deepEqual(ic1.once, {"reset": ic1.once.reset});
         ok($.isFunction(ic1.once.reset.done));
 
+        ok(looksLikePromise(ic2.api.once().simple));
         ic2.once.reset();
+        ok(looksLikePromise(ic2.api.once().simple));
         ok(looksLikeDeferred(ic2.once.simple));
         ok($.isFunction(ic2.once.reset.done));
     });
@@ -148,9 +155,23 @@
         equal(count, 0);
     });
 
+    test("public callback set to deferred before reset shouldn't be called after reset", function () {
+        var ic = $.intercal({"once": {"stuff": ""}}), count = 0;
+
+        ic.api.once().stuff.done(function () {
+            count += 1;
+        });
+
+        ic.once.reset();
+        ic.once.stuff.resolve();
+
+        equal(count, 0);
+    });
+
     test("create simple callback", function () {
         var ic = $.intercal({"on": {"simple": ""}});
         ok(looksLikeCallback(ic.on.simple));
+        ok(looksLikePublicCallback(ic.api.on().simple));
     });
 
     test("create simple child callbacks", function () {
@@ -158,6 +179,9 @@
 
         ok(looksLikeCallback(ic.on.page.ready));
         ok(looksLikeCallback(ic.on.page.close));
+
+        ok(looksLikePublicCallback(ic.api.on().page.ready));
+        ok(looksLikePublicCallback(ic.api.on().page.close));
     });
 
     test("create nested callbacks", function () {
@@ -175,32 +199,48 @@
         ok(looksLikeCallback(ic.on.page.ready.done));
         ok(looksLikeCallback(ic.on.page.ready.fail.horribly));
         ok(looksLikeCallback(ic.on.page.ready.fail.withStyle));
+
+        ok(looksLikePublicCallback(ic.api.on().page.ready.done));
+        ok(looksLikePublicCallback(ic.api.on().page.ready.fail.horribly));
+        ok(looksLikePublicCallback(ic.api.on().page.ready.fail.withStyle));
     });
 
     test("then is fired for simple callback", function () {
-        var ic = $.intercal({"on": {"simple": ""}}), value = 0;
+        var ic = $.intercal({"on": {"simple": ""}}), value = 0, pvalue;
 
         ic.on.simple.then(function (param) {
             value = param;
+        });
+
+        ic.api.on().simple.then(function (param) {
+            pvalue = param;
         });
 
         ic.on.simple.fire(42);
 
         equal(value, 42);
+        equal(pvalue, 42);
     });
 
     test("then is fired for callback list", function () {
-        var ic = $.intercal({"on": {"simple": "first second"}}), value = 0;
+        var ic = $.intercal({"on": {"simple": "first second"}}),
+            value = 0, pvalue = 0;
 
         ic.on.simple.then(function (param) {
             value = param;
         });
 
+        ic.api.on().simple.then(function (param) {
+            pvalue = param;
+        });
+
         ic.on.simple.first.fire(42);
         equal(value, 42);
+        equal(pvalue, 42);
 
         ic.on.simple.second.fire(99);
         equal(value, 99);
+        equal(pvalue, 99);
     });
 
     test("then is fired for callback object", function () {
@@ -212,13 +252,16 @@
                         "second": "done"
                     }
                 }
-            }), value = 0, value1 = 0, value2 = 0;
+            }),
+            value = 0, value1 = 0, value2 = 0,
+            pvalue = 0, pvalue1 = 0, pvalue2 = 0;
 
         ic.on.simple.then(function (param) {
             value = param;
         });
 
         ic.on.simple.first.then(function (param) {
+            equal(ic.on.simple.first.done, this);
             value1 = param;
         });
 
@@ -226,15 +269,34 @@
             value2 = param;
         });
 
+        ic.api.on().simple.then(function (param) {
+            pvalue = param;
+        });
+
+        ic.api.on().simple.first.then(function (param) {
+            equal(ic.on.simple.first.done, this);
+            pvalue1 = param;
+        });
+
+        ic.api.on().then(function (param) {
+            pvalue2 = param;
+        });
+
         ic.on.simple.first.done.fire(42);
         equal(value, 42);
         equal(value1, 42);
         equal(value2, 42);
+        equal(pvalue, 42);
+        equal(pvalue1, 42);
+        equal(pvalue2, 42);
 
         ic.on.simple.second.done.fire(99);
         equal(value, 99);
         equal(value1, 42);
         equal(value2, 99);
+        equal(pvalue, 99);
+        equal(pvalue1, 42);
+        equal(pvalue2, 99);
     });
 
     test("fail with reserved callback name in simple callback", function () {
