@@ -48,13 +48,18 @@
     module("intercal");
 
     test("empty constructor", function () {
-        ok($.intercal());
-        deepEqual($.intercal().once, {});
-        deepEqual($.intercal().on, {});
+        var ic1 = $.intercal(),
+            ic2 = $.intercal({});
 
-        ok($.intercal({}));
-        deepEqual($.intercal({}).once, {});
-        deepEqual($.intercal({}).on, {});
+        ok(ic1);
+        deepEqual(ic1.once, {"reset": ic1.once.reset});
+        deepEqual(ic1.on, {});
+        ok($.isFunction(ic1.once.reset.done));
+
+        ok(ic2);
+        deepEqual(ic2.once, {"reset": ic2.once.reset});
+        deepEqual(ic2.on, {});
+        ok($.isFunction(ic2.once.reset.done));
 
         ok($.intercal.barrier());
     });
@@ -102,6 +107,46 @@
         ok(looksLikeDeferred(ic.once.nested.reset.foo));
     });
 
+    test("reset works", function () {
+        var ic1 = $.intercal(),
+            ic2 = $.intercal({"once": {"simple": ""}});
+
+        deepEqual(ic1.once, {"reset": ic1.once.reset});
+        ic1.once.reset();
+        deepEqual(ic1.once, {"reset": ic1.once.reset});
+        ok($.isFunction(ic1.once.reset.done));
+
+        ic2.once.reset();
+        ok(looksLikeDeferred(ic2.once.simple));
+        ok($.isFunction(ic2.once.reset.done));
+    });
+
+    test("reset subscriptions work after reset", function () {
+        var ic = $.intercal(), count = 0;
+
+        ic.once.reset.done(function () {
+            count += 1;
+        });
+
+        ic.once.reset();
+        ic.once.reset();
+        ic.once.reset();
+
+        equal(count, 3);
+    });
+
+    test("callback set to deferred before reset shouldn't be called after reset", function () {
+        var ic = $.intercal({"once": {"stuff": ""}}), count = 0;
+
+        ic.once.stuff.done(function () {
+            count += 1;
+        });
+
+        ic.once.reset();
+        ic.once.stuff.resolve();
+
+        equal(count, 0);
+    });
 
     test("create simple callback", function () {
         var ic = $.intercal({"on": {"simple": ""}});

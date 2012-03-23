@@ -92,10 +92,22 @@
             obj = {
                 "once": {},
                 "on": {}
-            };
+            },
+            resetCallback;
 
-        buildDeferreds(onces, obj.once, true);
         buildCallbacks(events, obj.on);
+
+        resetCallback = $.Callbacks();
+
+        function reset() {
+            obj.once = buildDeferreds(onces, {"reset": obj.once.reset || reset}, true);
+            resetCallback.fire();
+        }
+
+        reset.done = resetCallback.add;
+
+        // build deferreds for the first time
+        reset();
 
         return obj;
     };
