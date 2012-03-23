@@ -39,39 +39,57 @@
     }
 
     function buildCallbacks(events, obj) {
-        var key, value, names, i, name, callback;
+        var key, value, names, i, name, callback, listener,
+            globalListener = $.Callbacks();
+
+        function listenCallback(callback, listener) {
+            listener = listener || $.Callbacks();
+
+            callback.add(listener.fire);
+
+            return listener;
+        }
 
         for (key in events) {
             value = events[key];
+            listener = $.Callbacks();
 
-            if (key === "any") {
+            if (key === "then") {
                 throw new intercal.Error("using reserved name for callback: " + key);
             }
 
             if ($.isPlainObject(value)) {
                 // if the value is an object create the nested callbacks
                 obj[key] = buildCallbacks(value, {});
+                obj[key].then(listener.fire);
 
             } else if (value === "") {
                 // if the value is an empty string construct the callback here
                 obj[key] = $.Callbacks();
+                listenCallback(obj[key], listener);
             } else {
                 // if the value is a space separated string construct
                 // the child callbacks
                 names = events[key].split(/\s+/);
-                obj[key] = {};
+                obj[key] = {"then": listener.add};
 
                 for (i = 0; i < names.length; i += 1) {
                     name = names[i];
 
-                    if (name === "any") {
+                    if (name === "then") {
                         throw new intercal.Error("using reserved name for callback: " + name);
                     } else if (name !== "") {
                         obj[key][name] = $.Callbacks();
+                        listenCallback(obj[key][name], listener);
                     }
                 }
             }
+
+            obj[key].then = listener.add;
+            listener.add(globalListener.fire);
         }
+
+        obj.then = globalListener.add;
 
         return obj;
     }

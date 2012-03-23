@@ -53,12 +53,12 @@
 
         ok(ic1);
         deepEqual(ic1.once, {"reset": ic1.once.reset});
-        deepEqual(ic1.on, {});
+        deepEqual(ic1.on, {"then": ic1.on.then});
         ok($.isFunction(ic1.once.reset.done));
 
         ok(ic2);
         deepEqual(ic2.once, {"reset": ic2.once.reset});
-        deepEqual(ic2.on, {});
+        deepEqual(ic2.on, {"then": ic2.on.then});
         ok($.isFunction(ic2.once.reset.done));
 
         ok($.intercal.barrier());
@@ -177,19 +177,79 @@
         ok(looksLikeCallback(ic.on.page.ready.fail.withStyle));
     });
 
+    test("then is fired for simple callback", function () {
+        var ic = $.intercal({"on": {"simple": ""}}), value = 0;
+
+        ic.on.simple.then(function (param) {
+            value = param;
+        });
+
+        ic.on.simple.fire(42);
+
+        equal(value, 42);
+    });
+
+    test("then is fired for callback list", function () {
+        var ic = $.intercal({"on": {"simple": "first second"}}), value = 0;
+
+        ic.on.simple.then(function (param) {
+            value = param;
+        });
+
+        ic.on.simple.first.fire(42);
+        equal(value, 42);
+
+        ic.on.simple.second.fire(99);
+        equal(value, 99);
+    });
+
+    test("then is fired for callback object", function () {
+        var
+            ic = $.intercal({
+                "on": {
+                    "simple": {
+                        "first": "done",
+                        "second": "done"
+                    }
+                }
+            }), value = 0, value1 = 0, value2 = 0;
+
+        ic.on.simple.then(function (param) {
+            value = param;
+        });
+
+        ic.on.simple.first.then(function (param) {
+            value1 = param;
+        });
+
+        ic.on.then(function (param) {
+            value2 = param;
+        });
+
+        ic.on.simple.first.done.fire(42);
+        equal(value, 42);
+        equal(value1, 42);
+        equal(value2, 42);
+
+        ic.on.simple.second.done.fire(99);
+        equal(value, 99);
+        equal(value1, 42);
+        equal(value2, 99);
+    });
+
     test("fail with reserved callback name in simple callback", function () {
-        shouldTrow({"on": {"any": ""}}, "intercal.Error");
+        shouldTrow({"on": {"then": ""}}, "intercal.Error");
     });
 
     test("fail with reserved callback name in simple nested callback", function () {
-        shouldTrow({"on": {"simple": "any"}}, "intercal.Error");
-        shouldTrow({"on": {"simple": "foo any"}}, "intercal.Error");
+        shouldTrow({"on": {"simple": "then"}}, "intercal.Error");
+        shouldTrow({"on": {"simple": "foo then"}}, "intercal.Error");
     });
 
     test("fail with reserved callback name in nested callbacks", function () {
-        shouldTrow({"on": {"nested": {"any": ""}}}, "intercal.Error");
-        shouldTrow({"on": {"nested": {"foo": "any"}}}, "intercal.Error");
-        shouldTrow({"on": {"nested": {"foo": "bar any"}}}, "intercal.Error");
+        shouldTrow({"on": {"nested": {"then": ""}}}, "intercal.Error");
+        shouldTrow({"on": {"nested": {"foo": "then"}}}, "intercal.Error");
+        shouldTrow({"on": {"nested": {"foo": "bar then"}}}, "intercal.Error");
     });
 
     module("barrier");
