@@ -119,6 +119,101 @@
         return (new Date()).getTime();
     }
 
+    function formatParams(options) {
+        var str = "", first = true, option, key;
+
+        for (key in options) {
+            if (first) {
+                str += "?";
+            }
+
+            option = options[key];
+
+            if (option !== undefined && option !== null) {
+                if (!first) {
+                    str += "&";
+                }
+
+                str += key + "=" + option;
+            }
+
+            first = false;
+        }
+
+        return str;
+    }
+
+    // join a list of path parts with slashes
+    // the last parameter can be an object with the params to
+    // be appended
+    function joinPath() {
+        var i, current, accum = [];
+
+        for (i = 0; i < arguments.length; i += 1) {
+            current = arguments[i];
+
+            if (typeof current === "string") {
+                if (i !== 0 && current[0] === "/") {
+                    current = current.slice(1);
+                }
+
+                if (current[current.length - 1] === "/") {
+                    current = current.slice(0, current.length - 1);
+                }
+
+                accum.push(current);
+            } else {
+                // if it's not a string it should be a plain object
+                // with the params
+                // return here with the path since it should be the
+                // last argument
+                return accum.join("/") + formatParams(current);
+            }
+
+        }
+
+        return accum.join("/");
+    }
+
+    function joinPathList(paths, params) {
+        return joinPath.apply(null, paths.concat([params || {}]));
+    }
+
+    // parse path given as param, if undefined parse the current path
+    // in the location variable
+    function parsePath(path) {
+        var i, parts, valparts, result = {}, key, value, pathname, query;
+
+        if (path === undefined) {
+            pathname = location.pathname;
+            query = location.search.slice(1);
+        } else {
+            parts = path.split("?");
+            pathname = parts[0];
+            query = parts[1] || "";
+        }
+
+        parts = query.split("&");
+
+        for (i = 0; i < parts.length; i += 1) {
+            valparts = parts[i].split("=");
+
+            if (valparts.length !== 2) {
+                continue;
+            }
+
+            key = $.trim(valparts[0]);
+            value = $.trim(valparts[1]);
+            result[key] = value;
+        }
+
+        return {
+            "path": pathname,
+            "params": result
+        };
+    }
+
+
     intercal = function (data) {
         data = data || {};
 
@@ -387,6 +482,14 @@
     intercal.any = function (items, count, timeout) {
         return intercal.barrier(items, timeout || 0, count || 1);
     };
+
+
+    intercal.path = {
+        join: joinPath,
+        joinList: joinPathList,
+        parse: parsePath
+    };
+
 
     intercal.Error = function (message) {
         this.name = "intercal.Error";

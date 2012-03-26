@@ -550,4 +550,57 @@
         }, "intercal.Error");
     });
 
+    module("resources");
+
+    test("path.join", function () {
+        function check(parts, params, expected) {
+            var result = $.intercal.path.join.apply(null, parts.concat([params || {}]));
+            equal($.intercal.path.joinList(parts, params), result);
+
+            equal(result, expected);
+        }
+
+        check(["a"], {}, "a");
+        check(["a"], null, "a");
+        check(["a"], undefined, "a");
+        check(["a", "b"], {}, "a/b");
+        check(["/a", "b"], {}, "/a/b");
+        check(["/a/", "/b"], {}, "/a/b");
+        check(["/a/", "/b/"], {}, "/a/b");
+        check(["/a/", "/b/", "c", "/d"], {}, "/a/b/c/d");
+
+        check(["a"], {"p": "hi"}, "a?p=hi");
+        check(["a", "b"], {"p": "hi"}, "a/b?p=hi");
+        check(["/a", "b"], {"p": "hi"}, "/a/b?p=hi");
+        check(["/a/", "/b"], {"p": "hi"}, "/a/b?p=hi");
+        check(["/a/", "/b/"], {"p": "hi"}, "/a/b?p=hi");
+        check(["/a/", "/b/", "c", "/d"], {"p": "hi"}, "/a/b/c/d?p=hi");
+
+        check(["a"], {"p": "hi", "foo": 5, "bar": false}, "a?p=hi&foo=5&bar=false");
+        check(["a", "b"], {"p": "hi", "foo": 5, "bar": false}, "a/b?p=hi&foo=5&bar=false");
+        check(["/a", "b"], {"p": "hi", "foo": 5, "bar": false}, "/a/b?p=hi&foo=5&bar=false");
+        check(["/a/", "/b"], {"p": "hi", "foo": 5, "bar": false}, "/a/b?p=hi&foo=5&bar=false");
+        check(["/a/", "/b/"], {"p": "hi", "foo": 5, "bar": false}, "/a/b?p=hi&foo=5&bar=false");
+        check(["/a/", "/b/", "c", "/d"], {"p": "hi", "foo": 5, "bar": false}, "/a/b/c/d?p=hi&foo=5&bar=false");
+    });
+
+    test("path.parse", function () {
+        function check(path, expectedPath, expectedParams) {
+            var result = $.intercal.path.parse(path);
+
+            equal(result.path, expectedPath);
+            deepEqual(result.params, expectedParams);
+        }
+
+        check("/a", "/a", {});
+        check("/a/b", "/a/b", {});
+        check("/a/b/c", "/a/b/c", {});
+        check("/a/b/c?", "/a/b/c", {});
+        check("/a/b/c?a=1", "/a/b/c", {"a": "1"});
+        check("/a/b/c/?a=1", "/a/b/c/", {"a": "1"});
+        check("/a/b/c/?a=1&b=asd", "/a/b/c/", {"a": "1", "b": "asd"});
+        check("/a/b/c/?a=1&b=asd&c=false", "/a/b/c/", {"a": "1", "b": "asd", "c": "false"});
+        check("/a/b/c/?a=1&b=asd&c=", "/a/b/c/", {"a": "1", "b": "asd", "c": ""});
+    });
+
 }());
