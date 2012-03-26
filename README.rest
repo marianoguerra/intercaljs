@@ -1,16 +1,20 @@
 intercaljs - manage callbacks and deferreds with style 
 ======================================================
 
-you discovered $.Deferred and maybe $.Callbacks and started using them
+you discovered $.ajax, $.Deferred and maybe $.Callbacks and started using them
 to handle the async world of a webapp.
 
-after a while your callbacks and deferreds are all over the place and the code
-is a mess. 
+after a while your ajax calls, callbacks and deferreds are all over the place
+and the code is a mess. 
 
 It's hard to know the kind of events your application generates and
 sometimes you don't have access to them from where you are.
 
 There is no single place to go look for the list of events and deferreds.
+
+There is no single place to go look at the URLs for the ajax requests. You
+change an API endpoint in the server and have to edit it in multiple places
+in the client since you ajax calls are scattered in the code
 
 There is no structure or convention on them.
 
@@ -24,8 +28,8 @@ if so, then intercaljs is for you.
 what is it?
 -----------
 
-intercaljs is a small jquery library that allows organizing your events and
-deferreds in one place, hierarchically.
+intercaljs is a small jquery library that allows organizing your events,
+resources, URLs and deferreds in one place, hierarchically.
 
 it also provides utilities to wait for a set of events/deferreds in a unified
 and clean way, for example:
