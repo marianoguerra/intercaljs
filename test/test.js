@@ -603,4 +603,238 @@
         check("/a/b/c/?a=1&b=asd&c=", "/a/b/c/", {"a": "1", "b": "asd", "c": ""});
     });
 
+    function checkRequest(ic, req, path, body, method, options, params, noBody) {
+        var original = ic.request;
+
+        ic.request = function (p, b, m, o) {
+            ic.request = original;
+            equal(p, path);
+            equal(m, method);
+
+            if (noBody) {
+                equal(b, undefined);
+            } else {
+                deepEqual(b, body);
+            }
+
+            deepEqual(o, options);
+        };
+
+        if (noBody) {
+            req(params, options);
+        } else {
+            req(body, params, options);
+        }
+    }
+
+    function checkAjaxRequest(ic, req, path, body, method, options, expectedOptions, params, noBody) {
+        var original = $.ajax;
+
+        $.ajax = function (p, opts) {
+            equal(p, path);
+            deepEqual(opts, expectedOptions);
+        };
+
+        if (noBody) {
+            req(params, options);
+        } else {
+            req(body, params, options);
+        }
+
+        $.ajax = original;
+    }
+
+
+    test("builds resources with one path", function () {
+        var ic = $.intercal({
+            "resource": {
+                "user": {
+                    "path": "/api/user"
+                }
+            }
+        });
+
+        ok($.isFunction(ic.resource.user.create));
+        ok($.isFunction(ic.resource.user.update));
+        ok($.isFunction(ic.resource.user.remove));
+        ok($.isFunction(ic.resource.user.get));
+
+        checkRequest(ic, ic.resource.user.create, "/api/user", {"name": "pedro"}, "POST", {});
+        checkRequest(ic, ic.resource.user.update, "/api/user", {"name": "pedro"}, "PUT", {});
+        checkRequest(ic, ic.resource.user.get, "/api/user", {}, "GET", {}, undefined, true);
+        checkRequest(ic, ic.resource.user.remove, "/api/user", {}, "DELETE", {}, undefined, true);
+    });
+
+    test("builds only specified requesters with path object", function () {
+        var request, ic = $.intercal({
+            "resource": {
+                "user": {
+                    "path": {
+                        "get": "/api/user/{id}",
+                        "post": "/api/user"
+                    }
+                }
+            }
+        });
+
+        checkRequest(ic, ic.resource.user.create, "/api/user", {"name": "pedro"}, "POST", {});
+        checkRequest(ic, ic.resource.user.get, "/api/user/{id}", {}, "GET", {}, undefined, true);
+
+        ok($.isFunction(ic.resource.user.create));
+        ok($.isFunction(ic.resource.user.get));
+        equal(ic.resource.user.update, undefined);
+        equal(ic.resource.user.remove, undefined);
+    });
+
+    test("builds only specified requesters with path object and space delimited methods", function () {
+        var request, ic = $.intercal({
+            "resourceConfig": {
+                "contentType": "application/json"
+            },
+            "resource": {
+                "user": {
+                    "path": {
+                        "get delete": "/api/user/{id}",
+                        "post put": "/api/user"
+                    }
+                }
+            }
+        });
+
+        checkRequest(ic, ic.resource.user.create, "/api/user", {"name": "pedro"}, "POST", {"contentType": "application/json"});
+        checkRequest(ic, ic.resource.user.get, "/api/user/{id}", {}, "GET", {"contentType": "application/json"}, undefined, true);
+        checkRequest(ic, ic.resource.user.update, "/api/user", {"name": "pedro"}, "PUT", {"contentType": "application/json"});
+        checkRequest(ic, ic.resource.user.remove, "/api/user/{id}", {}, "DELETE", {"contentType": "application/json"}, undefined, true);
+
+        ok($.isFunction(ic.resource.user.create));
+        ok($.isFunction(ic.resource.user.get));
+        ok($.isFunction(ic.resource.user.remove));
+        ok($.isFunction(ic.resource.user.update));
+    });
+
+    test("requester overrides config", function () {
+        var request, data = {"name": "pedro"},
+            dataStr = JSON.stringify(data),
+            ic = $.intercal({
+                "resourceConfig": {
+                    "contentType": "application/json"
+                },
+                "resource": {
+                    "user": {
+                        "path": {
+                            "get delete": "/api/user/{id}",
+                            "post put": "/api/user"
+                        }
+                    },
+                    "session": {
+                        "path": "/api/session",
+                        "config": {
+                            "contentType": "application/xml"
+                        }
+                    }
+
+                }
+            });
+
+        checkAjaxRequest(ic, ic.resource.user.create, "/api/user", data,
+                "POST", {},
+                {"contentType": "application/json", "data": dataStr, "type": "POST"});
+        checkAjaxRequest(ic, ic.resource.user.create, "/api/user", "asd",
+                "POST", {"contentType": "application/xml"},
+                {"contentType": "application/xml", "data": "asd", "type": "POST"});
+        checkAjaxRequest(ic, ic.resource.session.update, "/api/session", "asd",
+                "POST", {},
+                {"contentType": "application/xml", "data": "asd", "type": "PUT"});
+        checkAjaxRequest(ic, ic.resource.user.create,
+                "/api/user", "asd", "POST", {"contentType": "text/plain"},
+                {"contentType": "text/plain", "data": "asd", "type": "POST"});
+    });
+
+    test("requester interpolates path", function () {
+        var request, data = {"name": "pedro"},
+            dataStr = JSON.stringify(data),
+            ic = $.intercal({
+                "resource": {
+                    "user": {
+                        "path": {
+                            "get": "/api/user/{id}",
+                            "delete": "/api/user/{id}/{rev}",
+                            "post put": "/api/user"
+                        }
+                    }
+                }
+            });
+
+        checkAjaxRequest(ic, ic.resource.user.get, "/api/user/2", null,
+                "GET", {}, {"type": "GET"}, {"id": 2}, true);
+        checkAjaxRequest(ic, ic.resource.user.remove, "/api/user/2/asd", null,
+                "DELETE", {}, {"type": "DELETE"}, {"id": 2, "rev": "asd"}, true);
+    });
+
+    test("resource creation fails if no path defined", function () {
+        shouldTrow({"resource": {"user": {}}}, "intercal.Error");
+    });
+
+    module("template");
+
+    test("template replaces placeholders", function () {
+        function check(str, vars, expected) {
+            equal($.intercal.template(str, vars), expected, "'" + str + "' => '" + expected + "'?");
+        }
+
+        check("", {"a": "r"}, "");
+        check("a", {"a": "r"}, "a");
+        check("{a}", {"a": "r"}, "r");
+        check(" {a} ", {"a": "r"}, " r ");
+        check("{a} {a}", {"a": "r"}, "r r");
+        check("{a} y {a}", {"a": "r"}, "r y r");
+        check("{a} y {b} y {a}", {"a": "r", "b": "r1"}, "r y r1 y r");
+
+        check("", {"A": "r"}, "");
+        check("a", {"A": "r"}, "a");
+        check("{A}", {"A": "r"}, "r");
+        check(" {A} ", {"A": "r"}, " r ");
+        check("{A} {A}", {"A": "r"}, "r r");
+        check("{A} y {A}", {"A": "r"}, "r y r");
+        check("{A} y {b} y {A}", {"A": "r", "b": "r1"}, "r y r1 y r");
+
+        check("", {"varname": "r"}, "");
+        check("a", {"varname": "r"}, "a");
+        check("{varname}", {"varname": "r"}, "r");
+        check(" {varname} ", {"varname": "r"}, " r ");
+        check("{varname} {varname}", {"varname": "r"}, "r r");
+        check("{varname} y {varname}", {"varname": "r"}, "r y r");
+        check("{varname} y {b} y {varname}", {"varname": "r", "b": "r1"}, "r y r1 y r");
+
+        check("", {"VARNAME1": "r"}, "");
+        check("a", {"VARNAME1": "r"}, "a");
+        check("{VARNAME1}", {"VARNAME1": "r"}, "r");
+        check(" {VARNAME1} ", {"VARNAME1": "r"}, " r ");
+        check("{VARNAME1} {VARNAME1}", {"VARNAME1": "r"}, "r r");
+        check("{VARNAME1} y {VARNAME1}", {"VARNAME1": "r"}, "r y r");
+        check("{VARNAME1} y {b} y {VARNAME1}", {"VARNAME1": "r", "b": "r1"}, "r y r1 y r");
+
+        check("", {"varName1": "r"}, "");
+        check("a", {"varName1": "r"}, "a");
+        check("{varName1}", {"varName1": "r"}, "r");
+        check(" {varName1} ", {"varName1": "r"}, " r ");
+        check("{varName1} {varName1}", {"varName1": "r"}, "r r");
+        check("{varName1} y {varName1}", {"varName1": "r"}, "r y r");
+        check("{varName1} y {b} y {varName1}", {"varName1": "r", "b": "r1"}, "r y r1 y r");
+    });
+
+    test("template leaves unknown vars untouched", function () {
+        function check(str, vars, expected) {
+            equal($.intercal.template(str, vars), expected, "'" + str + "' => '" + expected + "'?");
+        }
+
+        check("{b}", {"a": "r"}, "{b}");
+        check("a {b}", {"a": "r"}, "a {b}");
+        check("{b} {a}", {"a": "r"}, "{b} r");
+        check(" {a} ", {"a": "r"}, " r ");
+        check("{a} {a}", {"a": "r"}, "r r");
+        check("{a} y {a}", {"a": "r"}, "r y r");
+        check("{a} y {b} y {a}", {"a": "r", "b": "r1"}, "r y r1 y r");
+    });
+
 }());
