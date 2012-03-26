@@ -153,11 +153,11 @@
             current = arguments[i];
 
             if (typeof current === "string") {
-                if (i !== 0 && current[0] === "/") {
+                if (i !== 0 && current.charAt(0) === "/") {
                     current = current.slice(1);
                 }
 
-                if (current[current.length - 1] === "/") {
+                if (current.charAt(current.length - 1) === "/") {
                     current = current.slice(0, current.length - 1);
                 }
 
