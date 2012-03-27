@@ -289,6 +289,10 @@
     function request(path, body, method, options) {
         var opts = {};
 
+        if (options.basePath) {
+            path = intercal.path.join(options.basePath, path);
+        }
+
         if (body) {
             if (options.contentType === "application/json") {
                 opts.data = JSON.stringify(body);

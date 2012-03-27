@@ -750,6 +750,55 @@
                 {"contentType": "text/plain", "data": "asd", "type": "POST"});
     });
 
+    test("requester adds timeout and basePath if defined in config", function () {
+        var request, data = {"name": "pedro"},
+            dataStr = JSON.stringify(data),
+            ic = $.intercal({
+                "resourceConfig": {
+                    "contentType": "application/json",
+                    "timeout": 1000,
+                    "basePath": "/base/"
+                },
+                "resource": {
+                    "user": {
+                        "path": {
+                            "get delete": "/api/user/{id}",
+                            "post put": "/api/user"
+                        }
+                    },
+                    "session": {
+                        "path": "/api/session",
+                        "config": {
+                            "contentType": "application/xml"
+                        }
+                    }
+
+                }
+            });
+
+        checkAjaxRequest(ic, ic.resource.user.create, "/base/api/user", data,
+            "POST", {}, {
+                "contentType": "application/json",
+                "data": dataStr,
+                "type": "POST",
+                "timeout": 1000
+            });
+        checkAjaxRequest(ic, ic.resource.user.create, "/base/api/user", "asd",
+            "POST", {"contentType": "application/xml"}, {
+                "contentType": "application/xml",
+                "data": "asd",
+                "type": "POST",
+                "timeout": 1000
+            });
+        checkAjaxRequest(ic, ic.resource.session.update, "/base/api/session",
+            "asd", "POST", {"timeout": 2000}, {
+                "contentType": "application/xml",
+                "data": "asd",
+                "type": "PUT",
+                "timeout": 2000
+            });
+    });
+
     test("requester interpolates path", function () {
         var request, data = {"name": "pedro"},
             dataStr = JSON.stringify(data),
