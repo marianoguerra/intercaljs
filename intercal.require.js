@@ -2,6 +2,7 @@
 define(["path/to/jquery"], function ($) {
     "use strict";
 
+    var intercal;
 
     function buildDeferreds(onces, obj, external, isTopLevel) {
         var key, value, names, i, name;
