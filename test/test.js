@@ -799,6 +799,53 @@
             });
     });
 
+    test("requester adds timestamp if defined in config", function () {
+        var request, data = {"name": "pedro"},
+            originalNow = $.intercal.now,
+            dataStr = JSON.stringify(data),
+            ic = $.intercal({
+                "resourceConfig": {
+                    "addTimestampParam": true
+                },
+                "resource": {
+                    "user": {
+                        "path": {
+                            "get delete": "/api/user?id={id}",
+                            "post put": "/api/user"
+                        }
+                    },
+                    "session": {
+                        "path": "/api/session",
+                        "config": {
+                            "timestampParamName": "tmstp"
+                        }
+                    }
+
+                }
+            });
+
+        $.intercal.now = function () {
+            return 5;
+        };
+
+        checkAjaxRequest(ic, ic.resource.user.create, "/api/user?t=5", data,
+            "POST", {}, {
+                "data": data,
+                "type": "POST"
+            });
+        checkAjaxRequest(ic, ic.resource.user.get, "/api/user?id=42&t=5", null,
+            "GET", {}, {
+                "type": "GET"
+            }, {"id": 42}, true);
+        checkAjaxRequest(ic, ic.resource.session.update, "/api/session?tmstp=5",
+            "asd", "POST", {}, {
+                "data": "asd",
+                "type": "PUT"
+            });
+
+        $.intercal.now = originalNow;
+    });
+
     test("requester interpolates path", function () {
         var request, data = {"name": "pedro"},
             dataStr = JSON.stringify(data),

@@ -286,11 +286,26 @@
         };
     }
 
+    function addParam(path, name, value) {
+        var sep;
+        if (path.indexOf("?") !== -1) {
+            sep = "&";
+        } else {
+            sep = "?";
+        }
+
+        return path + sep + name + "=" + value;
+    }
+
     function request(path, body, method, options) {
-        var opts = {};
+        var opts = {}, tvar;
 
         if (options.basePath) {
             path = intercal.path.join(options.basePath, path);
+        }
+
+        if (options.addTimestampParam) {
+            path = addParam(path, options.timestampParamName || "t", intercal.now());
         }
 
         if (body) {
@@ -313,7 +328,6 @@
 
         return $.ajax(path, opts);
     }
-
 
     intercal = function (data) {
         data = data || {};
@@ -423,7 +437,7 @@
 
             locked = true;
             total = items.length;
-            startTime = now();
+            startTime = intercal.now();
 
             if (timeout > 0) {
                 timeoutId = setTimeout(fireTimeout, timeout);
@@ -453,7 +467,7 @@
                     clearTimeout(timeoutId);
                 }
 
-                endTime = now();
+                endTime = intercal.now();
 
                 if (failedArgs.length === 0) {
                     barrier.resolve();
@@ -561,13 +575,13 @@
                     // time the barrier was locked
                     startTime: startTime,
                     // time running since the barrier was locked
-                    ellapsedTime: (endTime > 0) ? totalTime : now() - startTime,
+                    ellapsedTime: (endTime > 0) ? totalTime : intercal.now() - startTime,
                     // time when the barrier finished
                     endTime: endTime,
                     // total time between start and end
                     totalTime: totalTime,
                     // time remaining before timeout or -1 if already finished or timed out
-                    remainingTime: (endTime < 1 && timeout > 0) ? now() - (startTime + timeout) : -1,
+                    remainingTime: (endTime < 1 && timeout > 0) ? intercal.now() - (startTime + timeout) : -1,
                     // true if the barrier finished in some way
                     finished: locked && itemCount > 0 && items.length === 0,
                     // true if the barrier timedOut
@@ -622,6 +636,8 @@
             return vars[varname] || match;
         });
     };
+
+    intercal.now = now;
 
     intercal.Error = function (message) {
         this.name = "intercal.Error";
