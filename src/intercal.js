@@ -394,6 +394,8 @@
             locked = false,
             // items to wait for
             items = [],
+            // items that will be removed once they are completed
+            volatileItems = [],
             // total number of items after it's locked
             total = 0,
             // number of completed items
@@ -427,42 +429,13 @@
             barrier.reject('timeout');
         }
 
-        function lock() {
-
-            if (items.length === 0) {
-                throw new intercal.Error("trying to lock a barrier with no actions");
-            } else if (itemCount > 0 && items.length !== itemCount) {
-                throw new intercal.Error("trying to lock a barrier before reaching itemCount");
-            }
-
-            locked = true;
-            total = items.length;
-            startTime = intercal.now();
-
-            if (timeout > 0) {
-                timeoutId = setTimeout(fireTimeout, timeout);
-            }
-        }
-
-        function arrayRemove(arr, element) {
-            var i;
-
-            for (i = 0; i < arr.length; i += 1) {
-                if (element === arr[i]) {
-                    arr.splice(i, 1);
-                }
-            }
-
-            return arr;
-        }
-
         function checkCompletion() {
             if (timedOut) {
                 return;
             }
 
             // if all completed
-            if (waitCompletedCount === (total - items.length)) {
+            if (waitCompletedCount === (total - volatileItems.length)) {
                 if (timeoutId !== null) {
                     clearTimeout(timeoutId);
                 }
@@ -477,21 +450,61 @@
             }
         }
 
+        function lock() {
+
+            if (locked) {
+                return;
+            }
+
+            if (itemCount > 0 && items.length !== itemCount) {
+                throw new intercal.Error("trying to lock a barrier before reaching itemCount");
+            }
+
+            locked = true;
+            total = items.length;
+            startTime = intercal.now();
+
+            if (waitCompletedCount === 0) {
+                waitCompletedCount = total;
+            }
+
+            if (timeout > 0) {
+                timeoutId = setTimeout(fireTimeout, timeout);
+            }
+
+            checkCompletion();
+
+            return obj;
+        }
+
+        function arrayRemove(arr, element) {
+            var i;
+
+            for (i = 0; i < arr.length; i += 1) {
+                if (element === arr[i]) {
+                    arr.splice(i, 1);
+                }
+            }
+
+            return arr;
+        }
+
         function listenForCompletion(action) {
 
             function actionFired() {
-                arrayRemove(items, action);
+                arrayRemove(volatileItems, action);
                 // unsubscribe if it's a callback
                 if (action.add && action.has) {
                     action.remove(actionFired);
                 }
 
-                checkCompletion();
+                if (locked) {
+                    checkCompletion();
+                }
             }
 
             if (action.add && action.has) {
                 // if is a callbacks object
-
                 action.add(actionFired);
             } else {
                 // it must be a deferred/promise
@@ -514,6 +527,7 @@
                 for (i = 0; i < item.length; i += 1) {
                     action = item[i];
                     items.push(action);
+                    volatileItems.push(action);
 
                     listenForCompletion(action);
 
@@ -522,8 +536,9 @@
                         break;
                     }
                 }
-
             }
+
+            return obj;
         }
 
         // if the first parameter is an array, add the items and lock
@@ -557,7 +572,7 @@
             timeout: timeoutList.add,
 
             status: function () {
-                var completed = total - items.length,
+                var completed = total - volatileItems.length,
                     totalTime = -1,
                     remainingTime = -1;
 
@@ -583,7 +598,7 @@
                     // time remaining before timeout or -1 if already finished or timed out
                     remainingTime: (endTime < 1 && timeout > 0) ? intercal.now() - (startTime + timeout) : -1,
                     // true if the barrier finished in some way
-                    finished: locked && itemCount > 0 && items.length === 0,
+                    finished: locked && itemCount > 0 && volatileItems.length === 0,
                     // true if the barrier timedOut
                     timedOut: timedOut
                 };

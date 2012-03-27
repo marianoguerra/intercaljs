@@ -381,6 +381,30 @@
         testTimeout(barrier, barrier);
     });
 
+    function testResolveBeforeLock(things) {
+        var barrier = $.intercal.barrier(),
+            resolved = false, i;
+
+        barrier.done(function () {
+            resolved = true;
+        });
+
+        for (i = 0; i < things.length; i += 1) {
+            ok(!resolved);
+            barrier.add(things[i]);
+
+            if (things[i].fire) {
+                things[i].fire();
+            } else {
+                things[i].resolve();
+            }
+        }
+
+        barrier.lock();
+
+        ok(resolved);
+    }
+
     function testResolve(things) {
         var barrier = $.intercal.barrier(things),
             resolved = false, i;
@@ -438,6 +462,16 @@
 
     test("resolves mixed", function () {
         testResolve([dfd(), cbs()]);
+    });
+
+    test("resolves before lock works", function () {
+        testResolveBeforeLock([]);
+        testResolveBeforeLock([dfd()]);
+        testResolveBeforeLock([cbs()]);
+        testResolveBeforeLock([dfd(), cbs()]);
+        testResolveBeforeLock([cbs(), cbs()]);
+        testResolveBeforeLock([dfd(), dfd()]);
+        testResolveBeforeLock([dfd(), dfd(), cbs(), dfd(), dfd(), cbs()]);
     });
 
     test("firing the same callback twice doesn't resolve if another is waiting", function () {
