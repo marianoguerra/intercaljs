@@ -116,9 +116,201 @@ define(["path/to/jquery"], function ($) {
         return obj;
     }
 
+
+    function buildRequester(intercalInstance, path, method, options, noBodyMethod) {
+        if (noBodyMethod) {
+            return function (params, callOptions) {
+                var
+                    interpolatedPath = intercal.template(path, params),
+                    mergedOptions = $.extend(true, {}, options || {}, callOptions || {});
+
+                return intercalInstance.request(interpolatedPath, null, method, mergedOptions);
+            };
+        } else {
+            return function (body, params, callOptions) {
+                var
+                    interpolatedPath = intercal.template(path, params),
+                    mergedOptions = $.extend(true, {}, options || {}, callOptions || {});
+
+                return intercalInstance.request(interpolatedPath, body, method, mergedOptions);
+            };
+        }
+    }
+
+    function buildRequesters(methods, options, intercalInstance) {
+        var key, method, path, name, obj = {}, isNoBodyMethod;
+
+        for (key in methods) {
+            path = methods[key];
+            method = key.toUpperCase();
+            isNoBodyMethod = $.inArray(method, intercal._.noBodyMethods) !== -1;
+
+            // if method has no map in httpMethodMap use the original key
+            // to preserve case
+            name = intercal._.httpMethodMap[method] || key;
+            obj[name] = buildRequester(intercalInstance, path, method, options, isNoBodyMethod);
+        }
+
+        return obj;
+    }
+
+    function buildResourceHandlers(resources, obj, globalConfig, intercalInstance) {
+        var key, config, resource, method, methods = {}, parts, i;
+
+        for (key in resources) {
+            resource = resources[key];
+            // merge global config with resource-specific config
+            config = $.extend(true, {}, globalConfig, resource.config || {});
+
+            if (typeof resource.path === "string") {
+                methods = {
+                    "get": resource.path,
+                    "post": resource.path,
+                    "put": resource.path,
+                    "delete": resource.path
+                };
+            } else if ($.isPlainObject(resource.path)) {
+                for (method in resource.path) {
+                    parts = method.split(/\s+/);
+
+                    for (i = 0; i < parts.length; i += 1) {
+                        if (parts[i] === "") {
+                            continue;
+                        }
+
+                        methods[parts[i]] = resource.path[method];
+                    }
+                }
+            } else {
+                throw new intercal.Error("resource path missing");
+            }
+
+            obj[key] = buildRequesters(methods, config, intercalInstance);
+        }
+    }
+
     function now() {
         return (new Date()).getTime();
     }
+
+    function formatParams(options) {
+        var str = "", first = true, option, key;
+
+        for (key in options) {
+            if (first) {
+                str += "?";
+            }
+
+            option = options[key];
+
+            if (option !== undefined && option !== null) {
+                if (!first) {
+                    str += "&";
+                }
+
+                str += key + "=" + option;
+            }
+
+            first = false;
+        }
+
+        return str;
+    }
+
+    // join a list of path parts with slashes
+    // the last parameter can be an object with the params to
+    // be appended
+    function joinPath() {
+        var i, current, accum = [];
+
+        for (i = 0; i < arguments.length; i += 1) {
+            current = arguments[i];
+
+            if (typeof current === "string") {
+                if (i !== 0 && current.charAt(0) === "/") {
+                    current = current.slice(1);
+                }
+
+                if (current.charAt(current.length - 1) === "/") {
+                    current = current.slice(0, current.length - 1);
+                }
+
+                accum.push(current);
+            } else {
+                // if it's not a string it should be a plain object
+                // with the params
+                // return here with the path since it should be the
+                // last argument
+                return accum.join("/") + formatParams(current);
+            }
+
+        }
+
+        return accum.join("/");
+    }
+
+    function joinPathList(paths, params) {
+        return joinPath.apply(null, paths.concat([params || {}]));
+    }
+
+    // parse path given as param, if undefined parse the current path
+    // in the location variable
+    function parsePath(path) {
+        var i, parts, valparts, result = {}, key, value, pathname, query;
+
+        if (path === undefined) {
+            pathname = location.pathname;
+            query = location.search.slice(1);
+        } else {
+            parts = path.split("?");
+            pathname = parts[0];
+            query = parts[1] || "";
+        }
+
+        parts = query.split("&");
+
+        for (i = 0; i < parts.length; i += 1) {
+            valparts = parts[i].split("=");
+
+            if (valparts.length !== 2) {
+                continue;
+            }
+
+            key = $.trim(valparts[0]);
+            value = $.trim(valparts[1]);
+            result[key] = value;
+        }
+
+        return {
+            "path": pathname,
+            "params": result
+        };
+    }
+
+    function request(path, body, method, options) {
+        var opts = {};
+
+        if (body) {
+            if (options.contentType === "application/json") {
+                opts.data = JSON.stringify(body);
+            } else {
+                opts.data = body;
+            }
+        }
+
+        if (options.contentType) {
+            opts.contentType = options.contentType;
+        }
+
+        opts.type = method || "GET";
+
+        if (options.timeout) {
+            opts.timeout = options.timeout;
+        }
+
+        return $.ajax(path, opts);
+    }
+
 
     intercal = function (data) {
         data = data || {};
@@ -128,10 +320,13 @@ define(["path/to/jquery"], function ($) {
             onces = data.once || {},
             // event definitions
             events = data.on || {},
+            // resource definitions
+            resources = data.resource || {},
             // the object to be returned
             obj = {
                 "once": {},
-                "on": {}
+                "on": {},
+                "resource": {}
             },
             resetCallback,
             // external deferred API
@@ -142,6 +337,7 @@ define(["path/to/jquery"], function ($) {
             shouldUpdateOnceAPI = false;
 
         buildCallbacks(events, obj.on, eventAPI);
+        buildResourceHandlers(resources, obj.resource, data.resourceConfig || {}, obj);
 
         resetCallback = $.Callbacks();
 
@@ -169,6 +365,8 @@ define(["path/to/jquery"], function ($) {
             once: buildOnceAPI,
             on: buildOnAPI
         };
+
+        obj.request = request;
 
         return obj;
     };
@@ -384,9 +582,42 @@ define(["path/to/jquery"], function ($) {
         return obj;
     };
 
+    // the global default request function
+    // you can override it in your instance and then get back the original
+    // here
+    intercal.request = request;
     intercal.all = intercal.barrier;
     intercal.any = function (items, count, timeout) {
         return intercal.barrier(items, timeout || 0, count || 1);
+    };
+
+    // internal data exposed for testing and possible customization
+    // may change in the future
+    intercal._ = {
+        "httpMethodMap": {
+            "POST": "create",
+            "PUT": "update",
+            "DELETE": "remove",
+            "GET": "get"
+        },
+        "noBodyMethods": ["GET", "DELETE", "HEAD"]
+    };
+
+    intercal.path = {
+        join: joinPath,
+        joinList: joinPathList,
+        parse: parsePath
+    };
+
+    intercal.template = function interpolate(str, vars) {
+        if (!vars) {
+            return str;
+        }
+
+        return str.replace(/\{\w*?\}/g, function (match, v, t) {
+            var varname = match.slice(1, match.length - 1);
+            return vars[varname] || match;
+        });
     };
 
     intercal.Error = function (message) {
