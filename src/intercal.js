@@ -618,7 +618,10 @@
     // you can override it in your instance and then get back the original
     // here
     intercal.request = request;
-    intercal.all = intercal.barrier;
+    intercal.all = function () {
+        return intercal.barrier($.makeArray(arguments));
+    };
+
     intercal.any = function (items, count, timeout) {
         return intercal.barrier(items, timeout || 0, count || 1);
     };
