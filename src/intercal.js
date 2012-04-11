@@ -115,23 +115,30 @@
         return obj;
     }
 
+    function processRequestParams(path, params, options, callOptions) {
+        var finalPath,
+            mergedOptions = $.extend(true, {}, options || {}, callOptions || {});
+
+        if (mergedOptions.queryParams) {
+            finalPath = intercal.path.join(path, params);
+        } else {
+            finalPath = intercal.template(path, params);
+        }
+
+        return {path: finalPath, options: mergedOptions};
+    }
 
     function buildRequester(intercalInstance, path, method, options, noBodyMethod) {
+
         if (noBodyMethod) {
             return function (params, callOptions) {
-                var
-                    interpolatedPath = intercal.template(path, params),
-                    mergedOptions = $.extend(true, {}, options || {}, callOptions || {});
-
-                return intercalInstance.request(interpolatedPath, null, method, mergedOptions);
+                var data = processRequestParams(path, params, options, callOptions);
+                return intercalInstance.request(data.path, null, method, data.options);
             };
         } else {
             return function (body, params, callOptions) {
-                var
-                    interpolatedPath = intercal.template(path, params),
-                    mergedOptions = $.extend(true, {}, options || {}, callOptions || {});
-
-                return intercalInstance.request(interpolatedPath, body, method, mergedOptions);
+                var data = processRequestParams(path, params, options, callOptions);
+                return intercalInstance.request(data.path, body, method, data.options);
             };
         }
     }

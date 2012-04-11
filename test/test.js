@@ -901,6 +901,29 @@
                 "DELETE", {}, {"type": "DELETE"}, {"id": 2, "rev": "asd"}, true);
     });
 
+    test("requester adds params as query params if option set", function () {
+        var request, data = {"name": "pedro"},
+            dataStr = JSON.stringify(data),
+            ic = $.intercal({
+                "resource": {
+                    "user": {
+                        "path": {
+                            "get": "/api/user"
+                        },
+                        "config": {
+                            "queryParams": true
+                        }
+                    }
+                }
+            });
+
+        checkAjaxRequest(ic, ic.resource.user.get, "/api/user?id=2", null,
+                "GET", {}, {"type": "GET"}, {"id": 2}, true);
+        // this may fail if args are not added in the same order as they are defined
+        checkAjaxRequest(ic, ic.resource.user.get, "/api/user?id=2&name=bob&sponge=true", null,
+                "GET", {}, {"type": "GET"}, {"id": 2, "name": "bob", "sponge": true}, true);
+    });
+
     test("resource creation fails if no path defined", function () {
         shouldTrow({"resource": {"user": {}}}, "intercal.Error");
     });
