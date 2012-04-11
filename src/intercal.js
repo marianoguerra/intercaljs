@@ -337,6 +337,10 @@
 
         opts.type = method || "GET";
 
+        if (options.headers) {
+            opts.headers = options.headers;
+        }
+
         if (options.timeout) {
             opts.timeout = options.timeout;
         }
