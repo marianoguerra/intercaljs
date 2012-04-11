@@ -392,6 +392,24 @@
             return eventAPI;
         }
 
+        obj.request = request;
+
+        function get(path, options) {
+            return obj.request(path, null, "GET", options);
+        }
+
+        function post(path, body, options) {
+            return obj.request(path, body, "POST", options);
+        }
+
+        function put(path, body, options) {
+            return obj.request(path, body, "PUT", options);
+        }
+
+        function del(path, options) {
+            return obj.request(path, null, "DELETE", options);
+        }
+
         reset.done = resetCallback.add;
 
         // build deferreds for the first time
@@ -402,7 +420,20 @@
             on: buildOnAPI
         };
 
-        obj.request = request;
+        obj.http = {
+            get: get,
+            put: put,
+            post: post,
+            del: del
+        };
+
+        // make utilities accessible from the instance
+        obj.all = $.intercal.all;
+        obj.any = $.intercal.any;
+        obj.barrier = $.intercal.barrier;
+        obj.path = $.intercal.path;
+        obj.template = $.intercal.template;
+        obj.now = $.intercal.now;
 
         return obj;
     };
