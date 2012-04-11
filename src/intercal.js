@@ -304,6 +304,10 @@
         return path + sep + name + "=" + value;
     }
 
+    // if content type is application/json and body is defined it can be
+    // a plain object in which case it's passed directly to JSON.stringify
+    // or it can be an object with a toJSON function, in which case the function
+    // is called and the result passed to JSON.stringify
     function request(path, body, method, options) {
         var opts = {}, tvar;
 
@@ -317,6 +321,10 @@
 
         if (body) {
             if (options.contentType === "application/json") {
+                // if it has a toJSON function call it
+                // if not, use it as it is (should be a plain object)
+                body = $.isFunction(body.toJSON) ? body.toJSON() : body;
+
                 opts.data = JSON.stringify(body);
             } else {
                 opts.data = body;
