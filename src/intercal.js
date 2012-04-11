@@ -379,7 +379,10 @@
 
         function reset() {
             onceAPI = {};
-            obj.once = buildDeferreds(onces, {"reset": obj.once.reset || reset}, onceAPI, true);
+            obj.once = buildDeferreds(onces, {
+                    "reset": obj.once.reset || reset
+                }, onceAPI, true);
+
             shouldUpdateOnceAPI = true;
             resetCallback.fire();
         }
