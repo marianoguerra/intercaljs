@@ -117,23 +117,30 @@ define(["path/to/jquery"], function ($) {
         return obj;
     }
 
+    function processRequestParams(path, params, options, callOptions) {
+        var finalPath,
+            mergedOptions = $.extend(true, {}, options || {}, callOptions || {});
+
+        if (mergedOptions.queryParams) {
+            finalPath = intercal.path.join(path, params);
+        } else {
+            finalPath = intercal.template(path, params);
+        }
+
+        return {path: finalPath, options: mergedOptions};
+    }
 
     function buildRequester(intercalInstance, path, method, options, noBodyMethod) {
+
         if (noBodyMethod) {
             return function (params, callOptions) {
-                var
-                    interpolatedPath = intercal.template(path, params),
-                    mergedOptions = $.extend(true, {}, options || {}, callOptions || {});
-
-                return intercalInstance.request(interpolatedPath, null, method, mergedOptions);
+                var data = processRequestParams(path, params, options, callOptions);
+                return intercalInstance.request(data.path, null, method, data.options);
             };
         } else {
             return function (body, params, callOptions) {
-                var
-                    interpolatedPath = intercal.template(path, params),
-                    mergedOptions = $.extend(true, {}, options || {}, callOptions || {});
-
-                return intercalInstance.request(interpolatedPath, body, method, mergedOptions);
+                var data = processRequestParams(path, params, options, callOptions);
+                return intercalInstance.request(data.path, body, method, data.options);
             };
         }
     }
@@ -299,6 +306,10 @@ define(["path/to/jquery"], function ($) {
         return path + sep + name + "=" + value;
     }
 
+    // if content type is application/json and body is defined it can be
+    // a plain object in which case it's passed directly to JSON.stringify
+    // or it can be an object with a toJSON function, in which case the function
+    // is called and the result passed to JSON.stringify
     function request(path, body, method, options) {
         var opts = {}, tvar;
 
@@ -312,6 +323,10 @@ define(["path/to/jquery"], function ($) {
 
         if (body) {
             if (options.contentType === "application/json") {
+                // if it has a toJSON function call it
+                // if not, use it as it is (should be a plain object)
+                body = $.isFunction(body.toJSON) ? body.toJSON() : body;
+
                 opts.data = JSON.stringify(body);
             } else {
                 opts.data = body;
@@ -323,6 +338,10 @@ define(["path/to/jquery"], function ($) {
         }
 
         opts.type = method || "GET";
+
+        if (options.headers) {
+            opts.headers = options.headers;
+        }
 
         if (options.timeout) {
             opts.timeout = options.timeout;
@@ -362,7 +381,10 @@ define(["path/to/jquery"], function ($) {
 
         function reset() {
             onceAPI = {};
-            obj.once = buildDeferreds(onces, {"reset": obj.once.reset || reset}, onceAPI, true);
+            obj.once = buildDeferreds(onces, {
+                    "reset": obj.once.reset || reset
+                }, onceAPI, true);
+
             shouldUpdateOnceAPI = true;
             resetCallback.fire();
         }
@@ -375,6 +397,24 @@ define(["path/to/jquery"], function ($) {
             return eventAPI;
         }
 
+        obj.request = request;
+
+        function get(path, options) {
+            return obj.request(path, null, "GET", options);
+        }
+
+        function post(path, body, options) {
+            return obj.request(path, body, "POST", options);
+        }
+
+        function put(path, body, options) {
+            return obj.request(path, body, "PUT", options);
+        }
+
+        function del(path, options) {
+            return obj.request(path, null, "DELETE", options);
+        }
+
         reset.done = resetCallback.add;
 
         // build deferreds for the first time
@@ -385,7 +425,20 @@ define(["path/to/jquery"], function ($) {
             on: buildOnAPI
         };
 
-        obj.request = request;
+        obj.http = {
+            get: get,
+            put: put,
+            post: post,
+            del: del
+        };
+
+        // make utilities accessible from the instance
+        obj.all = $.intercal.all;
+        obj.any = $.intercal.any;
+        obj.barrier = $.intercal.barrier;
+        obj.path = $.intercal.path;
+        obj.template = $.intercal.template;
+        obj.now = $.intercal.now;
 
         return obj;
     };
