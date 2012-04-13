@@ -664,14 +664,26 @@
         }
     }
 
-    function checkAjaxRequest(ic, req, path, body, method, options, expectedOptions, params, noBody) {
+    function checkAjaxRequest(ic, req, path, body, method, options,
+            expectedOptions, params, noBody, fireOptions) {
+
         var original = $.ajax;
 
         $.ajax = function (p, opts) {
+            var dfd = $.Deferred();
+
             equal(p, path);
             deepEqual(opts, expectedOptions);
 
-            return $.Deferred();
+            if (fireOptions) {
+                if (fireOptions.succeed) {
+                    dfd.resolve.apply(dfd, fireOptions.args || []);
+                } else {
+                    dfd.reject.apply(dfd, fireOptions.args || []);
+                }
+            }
+
+            return dfd;
         };
 
         if (noBody) {
@@ -945,6 +957,42 @@
         equal(ic.on.resource.user.update, undefined);
     });
 
+    test("resource callbacks get called", function () {
+        var ic = $.intercal({
+                "resource": {
+                    "user": {
+                        "path": {
+                            "get post": "/api/user"
+                        }
+                    }
+                }
+            });
+
+        window.ic = ic;
+
+        ic.on.resource.user.get.add(function (success, a, b, c) {
+            equal(success, true, "success should be true for get");
+            equal(a, 1, "args should be passed");
+            equal(b, 2, "args should be passed");
+            equal(c, 3, "args should be passed");
+        });
+
+        ic.on.resource.user.create.add(function (success, msg) {
+            equal(success, false, "success should be false for create");
+            equal(msg, "hello", "args should be passed");
+        });
+
+        checkAjaxRequest(ic, ic.resource.user.get, "/api/user", null,
+                "GET", {}, {"type": "GET"}, {}, true,
+                {succeed: true, args: [1, 2, 3]});
+
+        checkAjaxRequest(ic, ic.resource.user.create, "/api/user",
+            "asd", "POST", {}, {
+                "data": "asd",
+                "type": "POST"
+            }, {}, false, {succeed: false, args: ["hello"]});
+    });
+
     test("resource creation fails if no path defined", function () {
         shouldTrow({"resource": {"user": {}}}, "intercal.Error");
     });
@@ -953,7 +1001,8 @@
 
     test("template replaces placeholders", function () {
         function check(str, vars, expected) {
-            equal($.intercal.template(str, vars), expected, "'" + str + "' => '" + expected + "'?");
+            equal($.intercal.template(str, vars), expected,
+                "'" + str + "' => '" + expected + "'?");
         }
 
         check("", {"a": "r"}, "");

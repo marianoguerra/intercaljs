@@ -144,7 +144,7 @@
     }
 
     function buildRequesters(methods, options, intercalInstance) {
-        var key, method, path, name, isNoBodyMethod, eventCallback,
+        var key, method, path, name, isNoBodyMethod, eventCallback, reqOpts,
             obj = {requesters: {}, callbacks: {}};
 
         for (key in methods) {
@@ -157,10 +157,13 @@
             name = intercal._.httpMethodMap[method] || key;
 
             eventCallback = $.Callbacks();
-            options.eventCallback = eventCallback;
+            // clone options for this case so we can add eventCallback for
+            // this iteration and don't modify it in the next one
+            reqOpts = $.extend(true, {}, options);
+            reqOpts.eventCallback = eventCallback;
 
             obj.requesters[name] = buildRequester(intercalInstance, path,
-                    method, options, isNoBodyMethod);
+                    method, reqOpts, isNoBodyMethod);
 
             obj.callbacks[name] = eventCallback;
         }
@@ -324,9 +327,9 @@
     function makeDeferredCallback(success, callback) {
         return function () {
             var args = $.makeArray(arguments);
-            args.unshift(true);
+            args.unshift(success);
 
-            callback.fire.apply(null, args);
+            callback.fire.apply(callback, args);
         };
     }
 
