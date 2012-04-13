@@ -144,7 +144,8 @@
     }
 
     function buildRequesters(methods, options, intercalInstance) {
-        var key, method, path, name, obj = {}, isNoBodyMethod;
+        var key, method, path, name, isNoBodyMethod, eventCallback,
+            obj = {requesters: {}, callbacks: {}};
 
         for (key in methods) {
             path = methods[key];
@@ -154,14 +155,22 @@
             // if method has no map in httpMethodMap use the original key
             // to preserve case
             name = intercal._.httpMethodMap[method] || key;
-            obj[name] = buildRequester(intercalInstance, path, method, options, isNoBodyMethod);
+
+            eventCallback = $.Callbacks();
+            options.eventCallback = eventCallback;
+
+            obj.requesters[name] = buildRequester(intercalInstance, path,
+                    method, options, isNoBodyMethod);
+
+            obj.callbacks[name] = eventCallback;
         }
 
         return obj;
     }
 
     function buildResourceHandlers(resources, obj, globalConfig, intercalInstance) {
-        var key, config, resource, method, methods = {}, parts, i;
+        var key, config, resource, method, methods = {}, parts, i, result,
+            callbacks = {};
 
         for (key in resources) {
             resource = resources[key];
@@ -191,8 +200,13 @@
                 throw new intercal.Error("resource path missing");
             }
 
-            obj[key] = buildRequesters(methods, config, intercalInstance);
+            result = buildRequesters(methods, config, intercalInstance);
+            obj[key] = result.requesters;
+
+            callbacks[key] = result.callbacks;
         }
+
+        return callbacks;
     }
 
     function now() {
@@ -304,12 +318,24 @@
         return path + sep + name + "=" + value;
     }
 
+    // make a function that can be used as a deferred callback that
+    // adds success arg to the front of the arguments received in the callback
+    // and fires the callback
+    function makeDeferredCallback(success, callback) {
+        return function () {
+            var args = $.makeArray(arguments);
+            args.unshift(true);
+
+            callback.fire.apply(null, args);
+        };
+    }
+
     // if content type is application/json and body is defined it can be
     // a plain object in which case it's passed directly to JSON.stringify
     // or it can be an object with a toJSON function, in which case the function
     // is called and the result passed to JSON.stringify
     function request(path, body, method, options) {
-        var opts = {}, tvar;
+        var opts = {}, ajaxRequest;
 
         if (options.basePath) {
             path = intercal.path.join(options.basePath, path);
@@ -345,7 +371,15 @@
             opts.timeout = options.timeout;
         }
 
-        return $.ajax(path, opts);
+        ajaxRequest = $.ajax(path, opts);
+
+        if (options.eventCallback) {
+            ajaxRequest
+                .done(makeDeferredCallback(true, options.eventCallback))
+                .fail(makeDeferredCallback(false, options.eventCallback));
+        }
+
+        return ajaxRequest;
     }
 
     intercal = function (data) {
@@ -358,6 +392,8 @@
             events = data.on || {},
             // resource definitions
             resources = data.resource || {},
+            // callbacks to fire on resource requests
+            resourceCallbacks,
             // the object to be returned
             obj = {
                 "once": {},
@@ -373,7 +409,10 @@
             shouldUpdateOnceAPI = false;
 
         buildCallbacks(events, obj.on, eventAPI);
-        buildResourceHandlers(resources, obj.resource, data.resourceConfig || {}, obj);
+        resourceCallbacks = buildResourceHandlers(resources, obj.resource,
+                data.resourceConfig || {}, obj);
+
+        obj.on.resource = resourceCallbacks;
 
         resetCallback = $.Callbacks();
 

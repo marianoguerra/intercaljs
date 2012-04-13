@@ -57,12 +57,12 @@
 
         ok(ic1);
         deepEqual(ic1.once, {"reset": ic1.once.reset});
-        deepEqual(ic1.on, {"then": ic1.on.then});
+        deepEqual(ic1.on, {"then": ic1.on.then, "resource": {}});
         ok($.isFunction(ic1.once.reset.done));
 
         ok(ic2);
         deepEqual(ic2.once, {"reset": ic2.once.reset});
-        deepEqual(ic2.on, {"then": ic2.on.then});
+        deepEqual(ic2.on, {"then": ic2.on.then, "resource": {}});
         ok($.isFunction(ic2.once.reset.done));
 
         ok($.intercal.barrier());
@@ -651,6 +651,9 @@
                 deepEqual(b, body);
             }
 
+            ok(looksLikeCallback(o.eventCallback));
+            // this one is added on the request
+            delete o.eventCallback;
             deepEqual(o, options);
         };
 
@@ -667,6 +670,8 @@
         $.ajax = function (p, opts) {
             equal(p, path);
             deepEqual(opts, expectedOptions);
+
+            return $.Deferred();
         };
 
         if (noBody) {
@@ -922,6 +927,22 @@
         // this may fail if args are not added in the same order as they are defined
         checkAjaxRequest(ic, ic.resource.user.get, "/api/user?id=2&name=bob&sponge=true", null,
                 "GET", {}, {"type": "GET"}, {"id": 2, "name": "bob", "sponge": true}, true);
+    });
+
+    test("resource adds event for it", function () {
+        var ic = $.intercal({
+                "resource": {
+                    "user": {
+                        "path": {
+                            "get post": "/api/user"
+                        }
+                    }
+                }
+            });
+
+        looksLikeCallback(ic.on.resource.user.get);
+        looksLikeCallback(ic.on.resource.user.create);
+        equal(ic.on.resource.user.update, undefined);
     });
 
     test("resource creation fails if no path defined", function () {
