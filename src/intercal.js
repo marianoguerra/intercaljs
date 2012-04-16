@@ -509,6 +509,18 @@
         obj.template = $.intercal.template;
         obj.now = $.intercal.now;
 
+        obj.util = {
+            "onSuccess": function (onSuccess, onError) {
+                return function (success) {
+                    if (success) {
+                        onSuccess();
+                    } else if ($.isFunction(onError)) {
+                        onError();
+                    }
+                };
+            }
+        };
+
         return obj;
     };
 
