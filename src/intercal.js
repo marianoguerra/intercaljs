@@ -385,6 +385,28 @@
         return ajaxRequest;
     }
 
+    // does nothing
+    function nop() {
+    }
+
+    // wrap console functions if available, otherwise create a dummy api
+    // that does nothing
+    function buildLogWrapper(log) {
+        function addIfExists(obj, name) {
+            if (obj && obj[name] && $.isFunction(obj[name])) {
+                log[name] = obj[name];
+            } else {
+                log[name] = nop;
+            }
+        }
+
+        addIfExists(console, "log");
+        addIfExists(console, "error");
+        addIfExists(console, "warn");
+        addIfExists(console, "debug");
+        addIfExists(console, "info");
+    }
+
     intercal = function (data) {
         data = data || {};
 
@@ -397,11 +419,16 @@
             resources = data.resource || {},
             // callbacks to fire on resource requests
             resourceCallbacks,
+            // log wrapper around console if available or silently ignore them
+            log = {},
             // the object to be returned
             obj = {
                 "once": {},
                 "on": {},
-                "resource": {}
+                "resource": {},
+                // data passed to constructor or an empty object
+                "data": data.data || {},
+                "log": log
             },
             resetCallback,
             // external deferred API
@@ -459,6 +486,8 @@
 
         // build deferreds for the first time
         reset();
+
+        buildLogWrapper(log);
 
         obj.api = {
             once: buildOnceAPI,
