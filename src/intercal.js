@@ -1,6 +1,7 @@
 (function ($) {
     "use strict";
-    var intercal;
+    var intercal, ajax = $.ajax, ajaxChecks = [],
+        methods = ['GET', 'POST', 'PUT', 'DELETE'];
 
     function buildDeferreds(onces, obj, external, isTopLevel) {
         var key, value, names, i, name;
@@ -512,10 +513,12 @@
         obj.util = {
             "onSuccess": function (onSuccess, onError) {
                 return function (success) {
+                    var args = $.makeArray(arguments).slice(1);
+
                     if (success) {
-                        onSuccess();
+                        onSuccess.apply(null, args);
                     } else if ($.isFunction(onError)) {
-                        onError();
+                        onError.apply(null, args);
                     }
                 };
             }
@@ -797,6 +800,64 @@
         this.name = "intercal.Error";
         this.message = message;
     };
+
+    function fakeAjax(url, settings) {
+        var i, check, dfd;
+
+        for (i = 0; i < ajaxChecks.length; i += 1) {
+            check = ajaxChecks[i];
+
+            if (check.check(url, settings)) {
+                dfd = $.Deferred();
+                check.returns(url, settings, dfd);
+                return dfd;
+            }
+        }
+
+        return ajax(url, settings);
+    }
+
+    intercal.ajax = {
+        "is": {}
+    };
+
+    intercal.ajax.mock = function (check, returns) {
+        ajaxChecks.push({check: check, returns: returns});
+
+        if ($.ajax === ajax) {
+            $.ajax = fakeAjax;
+        }
+    };
+
+    intercal.ajax.unmock = function () {
+        $.ajax = ajax;
+    };
+
+    intercal.ajax.is.method = function (method, path, contentType) {
+        return function (url, settings) {
+            var isPath;
+
+            if (path instanceof RegExp) {
+                isPath = path.test(url);
+            } else {
+                isPath = url === path;
+            }
+
+            if (isPath && settings.type === method) {
+                if (contentType == null || settings.contentType === contentType) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+    };
+
+    $.each(methods, function (i, method) {
+        intercal.ajax.is[method.toLowerCase()] = function (path, contentType) {
+            return intercal.ajax.is.method(method, path, contentType);
+        };
+    });
 
     $.intercal = intercal;
     return intercal;
