@@ -1,4 +1,19 @@
-(function ($) {
+/*global define*/
+(function (root, factory) {
+    "use strict";
+    if (typeof define === 'function' && define.amd) {
+        // AMD. Register as an anonymous module.
+        define(['jquery'], function ($) {
+            // Also create a global in case some scripts
+            // that are loaded still are looking for
+            // a global even when an AMD loader is in use.
+            return (root.intercal = factory($));
+        });
+    } else {
+        // Browser globals
+        root.intercal = factory(root.$);
+    }
+}(this, function ($) {
     "use strict";
     var intercal, ajax = $.ajax, ajaxChecks = [],
         methods = ['GET', 'POST', 'PUT', 'DELETE'];
@@ -864,4 +879,4 @@
     $.intercal = intercal;
     return intercal;
 
-}(jQuery));
+}));
