@@ -401,11 +401,11 @@
             }
         }
 
-        addIfExists(console, "log");
-        addIfExists(console, "error");
-        addIfExists(console, "warn");
-        addIfExists(console, "debug");
-        addIfExists(console, "info");
+        addIfExists(window.console, "log");
+        addIfExists(window.console, "error");
+        addIfExists(window.console, "warn");
+        addIfExists(window.console, "debug");
+        addIfExists(window.console, "info");
     }
 
     intercal = function (data) {
@@ -840,11 +840,13 @@
             if (path instanceof RegExp) {
                 isPath = path.test(url);
             } else {
-                isPath = url === path;
+                isPath = (url === path);
             }
 
             if (isPath && settings.type === method) {
-                if (contentType == null || settings.contentType === contentType) {
+                if (contentType === null ||
+                        contentType === undefined ||
+                        settings.contentType === contentType) {
                     return true;
                 }
             }
