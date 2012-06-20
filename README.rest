@@ -47,14 +47,6 @@ get it
 
     git clone https://github.com/marianoguerra/intercaljs
 
-build it
---------
-
-::
-
-    cd intercaljs
-    ./build.sh
-    
 learn more
 ----------
 
