@@ -380,8 +380,13 @@
             opts.contentType = options.contentType;
         }
 
-        if (options.accept) {
-            opts.accepts = options.accept;
+        if (options.accepts) {
+            opts.accepts = options.accepts;
+        }
+
+        if (options.dataType) {
+            opts.dataType = options.dataType;
+
         }
 
         opts.type = method || "GET";
