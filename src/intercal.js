@@ -380,6 +380,10 @@
             opts.contentType = options.contentType;
         }
 
+        if (options.accept) {
+            opts.accepts = options.accept;
+        }
+
         opts.type = method || "GET";
 
         if (options.headers) {
@@ -805,7 +809,7 @@
 
         return str.replace(/\{\w*?\}/g, function (match, v, t) {
             var varname = match.slice(1, match.length - 1);
-            return vars[varname] || match;
+            return (vars[varname] === undefined) ? match : vars[varname];
         });
     };
 

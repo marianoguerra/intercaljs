@@ -1,4 +1,4 @@
-/*global ok equal deepEqual fail test module start stop*/
+/*global ok equal deepEqual fail test module start stop $*/
 (function () {
     "use strict";
 
@@ -1004,6 +1004,10 @@
             equal($.intercal.template(str, vars), expected,
                 "'" + str + "' => '" + expected + "'?");
         }
+
+        check("/processor/id/{id}/snapshots?id=somethings&limit={limit}&skip={skip}",
+              {id: "foo", limit: 100, skip: 0},
+              "/processor/id/foo/snapshots?id=somethings&limit=100&skip=0");
 
         check("", {"a": "r"}, "");
         check("a", {"a": "r"}, "a");
