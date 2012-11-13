@@ -144,19 +144,53 @@
         return {path: finalPath, options: mergedOptions};
     }
 
+    function addParam(path, name, value) {
+        var sep;
+        if (path.indexOf("?") !== -1) {
+            sep = "&";
+        } else {
+            sep = "?";
+        }
+
+        return path + sep + name + "=" + value;
+    }
+
+    function makeRequestPath(path, options) {
+        if (options.basePath) {
+            path = intercal.path.join(options.basePath, path);
+        }
+
+        if (options.addTimestampParam) {
+            path = addParam(path, options.timestampParamName || "t", intercal.now());
+        }
+
+        return path;
+    }
+
     function buildRequester(intercalInstance, path, method, options, noBodyMethod) {
+        var requester;
 
         if (noBodyMethod) {
-            return function (params, callOptions) {
+            requester = function (params, callOptions) {
                 var data = processRequestParams(path, params, options, callOptions);
                 return intercalInstance.request(data.path, null, method, data.options);
             };
         } else {
-            return function (body, params, callOptions) {
+            requester = function (body, params, callOptions) {
                 var data = processRequestParams(path, params, options, callOptions);
                 return intercalInstance.request(data.path, body, method, data.options);
             };
         }
+
+        requester.formatUrl = function (params, callOptions) {
+            var
+                data = processRequestParams(path, params, options, callOptions),
+                finalPath = makeRequestPath(data.path, data.options);
+
+            return finalPath;
+        };
+
+        return requester;
     }
 
     function buildRequesters(methods, options, intercalInstance) {
@@ -326,17 +360,6 @@
         };
     }
 
-    function addParam(path, name, value) {
-        var sep;
-        if (path.indexOf("?") !== -1) {
-            sep = "&";
-        } else {
-            sep = "?";
-        }
-
-        return path + sep + name + "=" + value;
-    }
-
     // make a function that can be used as a deferred callback that
     // adds success arg to the front of the arguments received in the callback
     // and fires the callback
@@ -356,13 +379,7 @@
     function request(path, body, method, options) {
         var opts = {}, ajaxRequest;
 
-        if (options.basePath) {
-            path = intercal.path.join(options.basePath, path);
-        }
-
-        if (options.addTimestampParam) {
-            path = addParam(path, options.timestampParamName || "t", intercal.now());
-        }
+        path = makeRequestPath(path, options);
 
         if (body) {
             if (options.contentType === "application/json") {
