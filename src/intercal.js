@@ -1,4 +1,4 @@
-/*global window location define*/
+/*global window location define setTimeout clearTimeout*/
 (function (root, factory) {
     "use strict";
     if (typeof define === 'function' && define.amd) {
